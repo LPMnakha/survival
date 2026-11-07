@@ -2,8 +2,8 @@
 // fougères, rochers moussus, troncs couchés. Arbres, herbe, nuages, pluie,
 // neige et vent repris de Détente (outside.js) ; la météo (Annecy) et les
 // saisons pilotent couleurs, neige au sol et balancement.
-// Zone de 400 m : terrain en tuiles, arbres simplifiés au loin, petite
-// végétation dessinée seulement près du joueur (performances mobiles).
+// Zone de 800 m : terrain détaillé construit près du joueur, arbres simplifiés
+// au loin, petite végétation dessinée seulement près du joueur (mobiles).
 import * as THREE from '../vendor/three.module.min.js';
 import { makeNoise } from './noise.js';
 import { Builder, merge, mergeColored } from './builder.js';
@@ -12,40 +12,62 @@ const NZ = makeNoise(11);
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
 
-// zone de promenade : 400 m de côté, murs invisibles
-export const HALF = 200;
+// zone de promenade : 800 m de côté, murs invisibles
+export const HALF = 400;
 export const WALL = HALF - 1;
-const IN = 216; // terrain fin et forêt détaillée jusqu'ici
+const IN = 416; // terrain détaillé et forêt jusqu'ici
 export const SPAWN = { x: 5, z: 9 };
 
 // ---------------------------------------------------------------- ruisseau (coule du nord -z vers le sud +z)
 export const streamX = (z) => -13 + 9 * Math.sin(z * 0.03 + 0.5) + 3.5 * Math.sin(z * 0.077 + 2.1);
-const CROSSINGS = [-170, -110, -50, 7, 48, 110, 170]; // gués en pierres plates
+const CROSSINGS = [-390, -330, -270, -210, -170, -110, -50, 7, 48, 110, 170, 230, 290, 350, 390]; // gués en pierres plates
 // collines au loin, au-delà de la zone de promenade
 const hills = (x, z) => {
   const r = Math.hypot(x, z);
-  return Math.pow(smooth(230, 1100, r), 1.3) * (80 + 70 * NZ.fbm(x * 0.002 + 4, z * 0.002, 3));
+  return Math.pow(smooth(430, 1300, r), 1.3) * (80 + 70 * NZ.fbm(x * 0.002 + 4, z * 0.002, 3));
 };
 const waterBase = (z) => 0.6 - z * 0.022;
 export const waterY = (z) => waterBase(z) + hills(streamX(z), z);
+
+// ---------------------------------------------------------------- lieux abandonnés (sol aplani, dégagé)
+export const SITES = [
+  // tournés par quarts de tour : les collisions (rectangles) restent exactes
+  { id: 'cabane', x: 150, z: -135, r: 9, rot: 0 },
+  { id: 'campement', x: -210, z: 160, r: 7, rot: Math.PI / 2 },
+  { id: 'mirador', x: 95, z: 262, r: 6, rot: Math.PI },
+];
+export const nearSite = (x, z, pad = 0) => SITES.some((s) => Math.hypot(x - s.x, z - s.z) < s.r + pad);
 
 // ---------------------------------------------------------------- clairières
 const CLEARINGS = [
   { x: 3, z: 4, r: 12.5 }, { x: -41, z: -33, r: 13 }, { x: 40, z: 30, r: 12 },
   { x: 33, z: -46, r: 10 }, { x: -46, z: 45, r: 10 }, { x: 54, z: -4, r: 8 }, { x: 10, z: 55, r: 8 },
+  ...SITES.map((s) => ({ x: s.x, z: s.z, r: s.r + 6 })),
 ];
 {
   const R = makeNoise(23).rnd;
   let g = 0;
-  while (CLEARINGS.length < 28 && g++ < 4000) {
-    const x = (R() * 2 - 1) * 188, z = (R() * 2 - 1) * 188, r = 7 + R() * 7;
+  while (CLEARINGS.length < 105 && g++ < 20000) {
+    const x = (R() * 2 - 1) * 388, z = (R() * 2 - 1) * 388, r = 7 + R() * 7;
     if (CLEARINGS.some((c) => Math.hypot(c.x - x, c.z - z) < c.r + r + 24)) continue;
     CLEARINGS.push({ x, z, r });
   }
 }
+// rangées par carrés de 32 m, pour les retrouver vite
+const CL_GRID = new Map();
+for (const c of CLEARINGS) {
+  const lim = c.r * 1.4 * 1.25;
+  for (let i = Math.floor((c.x - lim) / 32); i <= Math.floor((c.x + lim) / 32); i++) for (let j = Math.floor((c.z - lim) / 32); j <= Math.floor((c.z + lim) / 32); j++) {
+    const k = i * 1000 + j;
+    if (!CL_GRID.has(k)) CL_GRID.set(k, []);
+    CL_GRID.get(k).push(c);
+  }
+}
 export function clearingAt(x, z) {
   let m = 0;
-  for (const c of CLEARINGS) {
+  const L = CL_GRID.get(Math.floor(x / 32) * 1000 + Math.floor(z / 32));
+  if (!L) return 0;
+  for (const c of L) {
     const dx = x - c.x, dz = z - c.z, lim = c.r * 1.4;
     if (dx > lim || dx < -lim || dz > lim || dz < -lim) continue;
     const d = Math.hypot(dx, dz);
@@ -57,7 +79,7 @@ export function clearingAt(x, z) {
 }
 
 // ---------------------------------------------------------------- relief
-export function height(x, z) {
+function rawHeight(x, z) {
   const d = Math.abs(x - streamX(z));
   const bank = waterBase(z) + 0.32;
   // monte doucement en s'éloignant du ruisseau, petites bosses de sous-bois, larges ondulations
@@ -69,6 +91,16 @@ export function height(x, z) {
   h += hills(x, z);
   // lit du ruisseau
   h -= 0.62 * smooth(1.7, 0.8, d);
+  return h;
+}
+for (const s of SITES) s.y = rawHeight(s.x, s.z);
+export function height(x, z) {
+  let h = rawHeight(x, z);
+  for (const s of SITES) {
+    const dx = x - s.x, dz = z - s.z;
+    if (dx * dx + dz * dz > (s.r + 10) * (s.r + 10)) continue;
+    h = lerp(h, s.y, smooth(s.r + 10, s.r + 1, Math.hypot(dx, dz)));
+  }
   return h;
 }
 
@@ -91,6 +123,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
   const col = new THREE.Color(), c2 = new THREE.Color(), tint = new THREE.Color();
   const uniforms = { uTime: { value: 0 }, uWind: { value: 0.2 } };
   const snowAmt = { value: 0 };
+  let curSnow = 0; // neige au sol actuelle (0..1), appliquée aussi aux tuiles construites plus tard
   const colliders = [];
   const birchZone = (x, z) => NZ.fbm(x * 0.02 + 3, z * 0.02, 2);
   const leafy = (x, z) => season.name === 'automne' && birchZone(x, z) > -0.25;
@@ -143,11 +176,13 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
       c2.set(0xeef1f4).lerp(col, Math.min(1, bed + smooth(0.55, 0.85, slope) * 0.6 + under));
       snowC.set([c2.r, c2.g, c2.b], v * 3);
     }
-    cur.set(base);
+    for (let i = 0; i < cur.length; i++) cur[i] = lerp(base[i], snowC[i], curSnow);
     geo.setAttribute('color', new THREE.BufferAttribute(cur, 3));
-    terrains.push({ geo, base, snow: snowC, cur });
+    const T = { geo, base, snow: snowC, cur };
+    terrains.push(T);
+    return T;
   }
-  const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true });
+  const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true, side: THREE.DoubleSide });
   const addTerrain = (geo) => {
     colorize(geo);
     const m = new THREE.Mesh(geo, groundMat);
@@ -155,35 +190,81 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
     scene.add(m);
   };
 
-  // ------------------------------------------------------------------ relief : tuiles fines sur la zone (dessinées si visibles)
-  const ST = mobile ? 1.5 : 1.0, TS = 48, NC = Math.round(TS / ST);
-  for (let tz = -IN; tz < IN; tz += TS) for (let tx = -IN; tx < IN; tx += TS) {
-    const pos = new Float32Array((NC + 1) * (NC + 1) * 3);
-    for (let j = 0; j <= NC; j++) for (let i = 0; i <= NC; i++) {
-      const x = tx + i * ST, z = tz + j * ST, k = (j * (NC + 1) + i) * 3;
-      pos[k] = x; pos[k + 1] = height(x, z); pos[k + 2] = z;
+  // ------------------------------------------------------------------ relief : tuiles de 64 m, grossières partout (4 m),
+  // détaillées (1 m) seulement autour du joueur, construites à la demande ; une jupe cache les raccords
+  const ST = mobile ? 1.5 : 1.0, STC = 4, TS = 64;
+  function tileGeo(tx, tz, step) {
+    const nc = Math.round(TS / step), w = nc + 1, st = TS / nc;
+    const pos = [], idx = [];
+    for (let j = 0; j <= nc; j++) for (let i = 0; i <= nc; i++) { const x = tx + i * st, z = tz + j * st; pos.push(x, height(x, z), z); }
+    for (let j = 0; j < nc; j++) for (let i = 0; i < nc; i++) {
+      const a = j * w + i, b = a + 1, c = a + w, d = c + 1;
+      if ((i + j) % 2) idx.push(a, c, b, b, c, d); else idx.push(a, c, d, a, d, b);
     }
-    const idx = new Uint32Array(NC * NC * 6);
-    let o = 0;
-    for (let j = 0; j < NC; j++) for (let i = 0; i < NC; i++) {
-      const a = j * (NC + 1) + i, b = a + 1, c = a + NC + 1, d = c + 1;
-      if ((i + j) % 2) idx.set([a, c, b, b, c, d], o); else idx.set([a, c, d, a, d, b], o);
-      o += 6;
+    // jupe : le bord de la tuile prolongé vers le bas
+    const edge = [];
+    for (let i = 0; i < nc; i++) edge.push(i);
+    for (let j = 0; j < nc; j++) edge.push(j * w + nc);
+    for (let i = nc; i > 0; i--) edge.push(nc * w + i);
+    for (let j = nc; j > 0; j--) edge.push(j * w);
+    const base = pos.length / 3;
+    for (const v of edge) pos.push(pos[v * 3], pos[v * 3 + 1] - 1.2, pos[v * 3 + 2]);
+    for (let k = 0; k < edge.length; k++) {
+      const a = edge[k], b = edge[(k + 1) % edge.length], a2 = base + k, b2 = base + ((k + 1) % edge.length);
+      idx.push(a, a2, b, b, a2, b2);
     }
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
     g.computeVertexNormals();
     g.computeBoundingSphere();
-    addTerrain(g);
+    return g;
+  }
+  const tiles = [];
+  for (let tz = -IN; tz < IN; tz += TS) for (let tx = -IN; tx < IN; tx += TS) {
+    const g = tileGeo(tx, tz, STC);
+    const T = colorize(g);
+    const m = new THREE.Mesh(g, groundMat);
+    m.receiveShadow = true;
+    scene.add(m);
+    tiles.push({ tx, tz, coarse: m, fine: null, fineT: null });
+  }
+  const tileDist = (t, p) => Math.hypot(Math.max(t.tx - p.x, 0, p.x - (t.tx + TS)), Math.max(t.tz - p.z, 0, p.z - (t.tz + TS)));
+  function buildFine(t) {
+    const g = tileGeo(t.tx, t.tz, ST);
+    t.fineT = colorize(g);
+    t.fine = new THREE.Mesh(g, groundMat);
+    t.fine.receiveShadow = true;
+    scene.add(t.fine);
+  }
+  function dropFine(t) {
+    scene.remove(t.fine);
+    t.fine.geometry.dispose();
+    terrains.splice(terrains.indexOf(t.fineT), 1);
+    t.fine = t.fineT = null;
+  }
+  const FINE_NEAR = 96, FINE_KEEP = 230;
+  for (const t of tiles) if (tileDist(t, SPAWN) < FINE_NEAR) buildFine(t);
+  let fineQueue = [];
+  function updateTiles(cam) {
+    fineQueue = [];
+    for (const t of tiles) {
+      const d = tileDist(t, cam);
+      if (!t.fine && d < FINE_NEAR) fineQueue.push([d, t]);
+      if (t.fine && d > FINE_KEEP) dropFine(t);
+      const useFine = !!t.fine && d < FINE_NEAR + 8;
+      t.coarse.visible = !useFine;
+      if (t.fine) t.fine.visible = useFine;
+    }
+    fineQueue.sort((a, b) => a[0] - b[0]);
   }
   // au-delà : grille de plus en plus large jusqu'à l'horizon (trou au centre, bords raccordés aux tuiles)
   {
     const fine = [];
-    for (let v = -IN; v <= IN + 1e-6; v += ST) fine.push(Math.round(v * 1000) / 1000);
+    for (let v = -IN; v <= IN + 1e-6; v += STC) fine.push(Math.round(v * 1000) / 1000);
     const coarse = [];
-    let v = IN, s = ST;
-    while (v < 3600) { s *= 1.16; v += s; coarse.push(v); }
+    let v = IN, s = STC;
+    while (v < 3600) { s *= 1.12; v += s; coarse.push(v); }
     const L = [...coarse.slice().reverse().map((x) => -x), ...fine, ...coarse];
     const n = L.length;
     const map = new Map(), pos = [], idx = [];
@@ -209,7 +290,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
   const WS = mobile ? 0.8 : 0.5, COLS = 4;
   const wpos = [], widx = [];
   let rows = 0;
-  for (let z = -340; z <= 340; z += WS, rows++) {
+  for (let z = -640; z <= 640; z += WS, rows++) {
     const sx = streamX(z), y = waterY(z);
     for (let c = 0; c < COLS; c++) wpos.push(sx + (-1 + (2 * c) / (COLS - 1)) * 1.5, y, z);
   }
@@ -337,6 +418,15 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
     if (!CG.has(k)) CG.set(k, []);
     CG.get(k).push(c);
   };
+  // un grand rectangle (mur de cabane…) : rangé dans tous les carrés qu'il touche
+  function addCollider(c) {
+    colliders.push(c);
+    for (let i = Math.floor(c.x0 / 8); i <= Math.floor(c.x1 / 8); i++) for (let j = Math.floor(c.z0 / 8); j <= Math.floor(c.z1 / 8); j++) {
+      const k = gk(i, j);
+      if (!CG.has(k)) CG.set(k, []);
+      CG.get(k).push(c);
+    }
+  }
   // y a-t-il un obstacle (arbre, rocher, tronc) dans ce disque ?
   function blocked(x, z, r) {
     for (let i = Math.floor((x - r - 2) / 8); i <= Math.floor((x + r + 2) / 8); i++) for (let j = Math.floor((z - r - 2) / 8); j <= Math.floor((z + r + 2) / 8); j++) {
@@ -360,7 +450,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
       if (cl > 0.3 && rnd() > 0.015) continue;
       const d = streamD(x, z);
       if (d < 2.4 || (d < 3.8 && rnd() < 0.7)) continue;
-      if (nearSpawn(x, z, 6)) continue;
+      if (nearSpawn(x, z, 6) || nearSite(x, z, 3)) continue;
       if (NZ.fbm(x * 0.03 + 11, z * 0.03, 2) < -0.25 && rnd() < 0.55) continue;
       const isBirch = rnd() < (birchZone(x, z) > 0.05 ? 0.5 : 0.12) + (cl > 0.02 || d < 9 ? 0.25 : 0);
       if (!gClear(x, z, isBirch ? 1.2 : 1.5)) continue;
@@ -370,8 +460,8 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
       count++;
       if (inWalk(x, z)) box(x, z, (isBirch ? 0.1 : 0.2) * s + 0.02);
     }
-    const OUT = 340;
-    const nOut = mobile ? 2600 : 4200;
+    const OUT = IN + 130;
+    const nOut = mobile ? 4500 : 7500;
     count = 0; guard = 0;
     while (count < nOut && guard++ < nOut * 20) {
       const x = (rnd() * 2 - 1) * OUT, z = (rnd() * 2 - 1) * OUT;
@@ -414,25 +504,27 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
   const tints = new Map();
   const tintOf = (fn) => (s) => { if (!tints.has(s)) tints.set(s, fn().clone()); return tints.get(s); };
   const sTint = tintOf(trunkTint), cTint = tintOf(crownTint);
+  // au loin, les arbres simplifiés sont regroupés en gros paquets (moins d'appels de dessin) et s'arrêtent à FAR
+  const FAR = mobile ? 320 : 380, LOW = { near: NEAR, far: FAR, size: 108 };
   chunked(fSpruceGeo, treeMat, inner.spruce, { cast: true, color: sTint, far: NEAR });
-  chunked(fSpruceLow, treeMat, inner.spruce, { color: sTint, near: NEAR });
+  chunked(fSpruceLow, treeMat, inner.spruce, { color: sTint, ...LOW });
   chunked(birchGeo, treeMat, inner.birch, { cast: true, far: NEAR });
-  chunked(birchLow, treeMat, inner.birch, { near: NEAR });
+  chunked(birchLow, treeMat, inner.birch, LOW);
   chunked(spruceGeo, treeMat, outer.spruce, { color: sTint, far: NEAR });
-  chunked(spruceLow, treeMat, outer.spruce, { color: sTint, near: NEAR });
+  chunked(spruceLow, treeMat, outer.spruce, { color: sTint, ...LOW });
   chunked(birchGeo, treeMat, outer.birch, { far: NEAR });
-  chunked(birchLow, treeMat, outer.birch, { near: NEAR });
+  chunked(birchLow, treeMat, outer.birch, LOW);
   chunked(fCapGeo, snowCapMat, inner.spruce, { far: NEAR, group: 'caps' });
-  chunked(fCapLow, snowCapMat, inner.spruce, { near: NEAR, group: 'caps' });
+  chunked(fCapLow, snowCapMat, inner.spruce, { ...LOW, group: 'caps' });
   chunked(capGeo, snowCapMat, outer.spruce, { far: NEAR, group: 'caps' });
-  chunked(capLow, snowCapMat, outer.spruce, { near: NEAR, group: 'caps' });
+  chunked(capLow, snowCapMat, outer.spruce, { ...LOW, group: 'caps' });
   if (season.name !== 'hiver') {
     const keep = () => rnd() >= season.autumnBare * 0.9;
     const cIn = inner.birch.filter(keep), cOut = outer.birch.filter(keep);
     chunked(crownGeo, leafMat, cIn, { cast: true, color: cTint, far: NEAR });
-    chunked(crownLow, leafMat, cIn, { color: cTint, near: NEAR });
+    chunked(crownLow, leafMat, cIn, { color: cTint, ...LOW });
     chunked(crownGeo, leafMat, cOut, { color: cTint, far: NEAR });
-    chunked(crownLow, leafMat, cOut, { color: cTint, near: NEAR });
+    chunked(crownLow, leafMat, cOut, { color: cTint, ...LOW });
   }
 
   // ------------------------------------------------------------------ troncs couchés, gués (fusionnés)
@@ -440,14 +532,14 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
   B.defineMaterial('plain', snowy(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }), 'bois'));
   {
     let made = 0, guard = 0;
-    const nLogs = 64;
+    const nLogs = 220;
     while (made < nLogs && guard++ < 12000) {
       const x = (rnd() * 2 - 1) * (WALL - 8), z = (rnd() * 2 - 1) * (WALL - 8);
       const len = 4 + rnd() * 5, r = 0.2 + rnd() * 0.16, a = rnd() * Math.PI;
       const ca = Math.cos(a), sa = Math.sin(a);
       const pts = [];
       for (let t = -len / 2 - 0.4; t <= len / 2 + 0.41; t += 0.7) pts.push([x + ca * t, z - sa * t]);
-      if (pts.some(([px, pz]) => clearingAt(px, pz) > 0.4 || streamD(px, pz) < 2.9 || nearSpawn(px, pz, 7) || !gClear(px, pz, r + 0.6))) continue;
+      if (pts.some(([px, pz]) => clearingAt(px, pz) > 0.4 || streamD(px, pz) < 2.9 || nearSpawn(px, pz, 7) || nearSite(px, pz, 2) || !gClear(px, pz, r + 0.6))) continue;
       const h0 = height(x - ca * len / 2, z + sa * len / 2), h1 = height(x + ca * len / 2, z - sa * len / 2);
       const tilt = Math.atan2(h1 - h0, len);
       const y = (h0 + h1) / 2 + r * 0.55;
@@ -527,20 +619,20 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
   const rockMat = snowy(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }), 'roche');
   const rocks = [[], [], []];
   const addRock = (x, z, s) => {
-    if (nearSpawn(x, z, 4.5) || streamD(x, z) < 1.75 || !gClear(x, z, 0.45 * s + 0.2)) return false;
+    if (nearSpawn(x, z, 4.5) || nearSite(x, z, 1) || streamD(x, z) < 1.75 || !gClear(x, z, 0.45 * s + 0.2)) return false;
     const sx = s * (0.8 + rnd() * 0.5), sy = s * (0.55 + rnd() * 0.35);
     rocks[Math.floor(rnd() * 3)].push({ x, z, y: height(x, z) - 0.12 * sy, sx, sy, sz: s, rot: rnd() * 6.28, tx: (rnd() - 0.5) * 0.3, tz: (rnd() - 0.5) * 0.3 });
     gAdd(x, z, 0.45 * Math.max(sx, s));
     if (s > 0.55 && inWalk(x, z)) box(x, z, 0.4 * Math.max(sx, s));
     return true;
   };
-  for (let c = 0; c < 64; c++) {
+  for (let c = 0; c < 230; c++) {
     const cx = (rnd() * 2 - 1) * (IN - 6), cz = (rnd() * 2 - 1) * (IN - 6);
     const k = 2 + Math.floor(rnd() * 4);
     for (let i = 0; i < k; i++) addRock(cx + (rnd() - 0.5) * 6, cz + (rnd() - 0.5) * 6, 0.6 + rnd() * 1.3);
   }
-  for (let i = 0; i < (mobile ? 480 : 720); i++) addRock((rnd() * 2 - 1) * (IN - 6), (rnd() * 2 - 1) * (IN - 6), 0.3 + Math.pow(rnd(), 2) * 1.1);
-  for (let i = 0; i < 240; i++) {
+  for (let i = 0; i < (mobile ? 1700 : 2600); i++) addRock((rnd() * 2 - 1) * (IN - 6), (rnd() * 2 - 1) * (IN - 6), 0.3 + Math.pow(rnd(), 2) * 1.1);
+  for (let i = 0; i < 860; i++) {
     const z = (rnd() * 2 - 1) * IN;
     if (CROSSINGS.some((c) => Math.abs(z - c) < 2.5)) continue;
     addRock(streamX(z) + (rnd() < 0.5 ? -1 : 1) * (1.8 + rnd() * 0.6), z, 0.3 + rnd() * 0.45);
@@ -554,7 +646,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
     while (out.length < count && g2++ < count * 30) {
       const x = (rnd() * 2 - 1) * R, z = (rnd() * 2 - 1) * R;
       const d = streamD(x, z);
-      if (d < 1.6) continue;
+      if (d < 1.6 || nearSite(x, z, -1)) continue;
       const cl = clearingAt(x, z);
       if (rnd() > want(x, z, d, cl)) continue;
       out.push({ x, z, h: height(x, z), d, cl });
@@ -730,6 +822,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
     const sAmt = Math.max(smooth(0.0, 0.06, w.snowDepth || 0), w.snow * 0.5);
     if (Math.abs(sAmt - snowShown) > 0.02) {
       snowShown = sAmt;
+      curSnow = sAmt;
       for (const T of terrains) {
         for (let i = 0; i < T.cur.length; i++) T.cur[i] = lerp(T.base[i], T.snow[i], sAmt);
         T.geo.attributes.color.needsUpdate = true;
@@ -744,7 +837,9 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
       lodTimer = 0;
     }
     lodTimer -= dt;
-    if (lodTimer <= 0) { lodTimer = 0.25; updateLods(cam); }
+    if (lodTimer <= 0) { lodTimer = 0.25; updateLods(cam); updateTiles(cam); }
+    // une tuile détaillée construite par image au plus (pas d'à-coup)
+    if (fineQueue.length) { const [, t] = fineQueue.shift(); if (!t.fine) { buildFine(t); t.coarse.visible = false; } }
     // nuages
     clouds.rotation.y += dt * (0.0008 + w.wind * 0.003);
     const cov = w.cloud;
@@ -767,7 +862,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
   return {
     update, groundAt, clamp, surfaceAt, colliders, streamDist: streamD, spawn: SPAWN,
     // pour les objets au sol et le feu de camp
-    clearingAt, leafy, blocked, isFree: gClear, addLod, chunked, inWalk,
-    snowShown: () => snowShown, _lods: lods, _hidden: hiddenGroups,
+    clearingAt, leafy, blocked, isFree: gClear, addLod, chunked, inWalk, addCollider, nearSite, sites: SITES, snowy,
+    snowShown: () => snowShown, _lods: lods, _hidden: hiddenGroups, tiles,
   };
 }

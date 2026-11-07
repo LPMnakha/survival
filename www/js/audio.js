@@ -160,8 +160,33 @@ export function createForestAudio() {
     if (type === 'caillou') { knock(t, 1400, 900, 0.05, 0.05); burst(t, 0.04, 'bandpass', 2600, 2, 0.04); knock(t + 0.07, 1250, 850, 0.04, 0.03); }
     else if (type === 'brindille') { for (let i = 0; i < 4; i++) burst(t + i * 0.02 + Math.random() * 0.01, 0.04, 'bandpass', 3200 + Math.random() * 2000, 1.4, 0.035); }
     else if (type === 'baton') { knock(t, 230, 150, 0.12, 0.08); burst(t, 0.08, 'bandpass', 700, 3, 0.05); }
+    else if (type === 'bache') { for (let i = 0; i < 6; i++) burst(t + i * 0.03 + Math.random() * 0.02, 0.06, 'highpass', 2500 + Math.random() * 2500, 0.8, 0.03); }
+    else if (type === 'bouteille') { knock(t, 520, 380, 0.07, 0.04); burst(t + 0.01, 0.05, 'bandpass', 1800, 2, 0.03); }
+    else if (type === 'sacoche') { burst(t, 0.18, 'bandpass', 900, 0.8, 0.05); burst(t + 0.08, 0.1, 'lowpass', 500, 0.7, 0.04); }
+    else if (type === 'baies') { for (let i = 0; i < 5; i++) burst(t + i * 0.035, 0.08, 'bandpass', 2000 + Math.random() * 1500, 0.9, 0.035); }
     else burst(t, 0.12, 'lowpass', 800, 0.7, 0.04);
   }
+  // eau versée dans la bouteille : glouglou qui monte
+  function pourSound(t) {
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 3;
+    f.frequency.setValueAtTime(500, t); f.frequency.linearRampToValueAtTime(1400, t + 0.9);
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 11;
+    const lg = ctx.createGain(); lg.gain.value = 180;
+    lfo.connect(lg).connect(f.frequency);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.08); g.gain.setValueAtTime(0.09, t + 0.75); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
+    s.connect(f).connect(g).connect(master); s.start(t, Math.random() * 2); s.stop(t + 1.05); lfo.start(t); lfo.stop(t + 1.05);
+  }
+  // gorgées : petits « glou » graves et doux
+  function gulps(t) {
+    for (let i = 0; i < 3; i++) {
+      const at = t + i * 0.28;
+      knock(at, 210, 120, 0.12, 0.06);
+      burst(at, 0.08, 'lowpass', 380, 0.8, 0.04);
+    }
+  }
+  // croquer des baies
+  function crunch(t) { for (let i = 0; i < 3; i++) { burst(t + i * 0.12, 0.05, 'bandpass', 1500 + Math.random() * 800, 1.5, 0.04); knock(t + i * 0.12, 300, 180, 0.05, 0.025); } }
   function scrape(t) {
     const s = ctx.createBufferSource(); s.buffer = buf;
     const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2.5;
@@ -221,6 +246,9 @@ export function createForestAudio() {
     pick(type) { handle(type, ctx.currentTime + 0.01); },
     place(type) { handle(type, ctx.currentTime + 0.01); },
     strike() { scrape(ctx.currentTime + 0.005); },
+    pour() { pourSound(ctx.currentTime); },
+    drink() { gulps(ctx.currentTime + 0.05); },
+    eat() { crunch(ctx.currentTime + 0.02); },
     ignite() { whoosh(ctx.currentTime + 0.05); },
     setFire(level) { fireLevel = level; fireBus.gain.setTargetAtTime(Math.min(1, level * 1.3), ctx.currentTime, 0.25); },
     async start() {

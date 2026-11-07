@@ -66,11 +66,11 @@ canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block;
 
 /* indices et boutons d'action (comme dans Détente) */
 #hint-pill {
-  position: fixed; top: calc(18px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  position: fixed; top: calc(64px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
   padding: 8px 16px; border-radius: 999px; font-size: 14px; color: var(--ink-soft);
   background: rgba(20, 13, 9, 0.32); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   opacity: 0; transition: opacity 0.8s ease; pointer-events: none;
-  width: max-content; max-width: calc(100% - 96px); text-align: center; line-height: 1.35;
+  width: max-content; max-width: calc(100% - 32px); text-align: center; line-height: 1.35;
 }
 #hint-pill.on { opacity: 1; }
 #actions {
@@ -78,7 +78,7 @@ canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block;
   display: flex; gap: 10px; opacity: 0; pointer-events: none; transition: opacity 0.5s ease, transform 0.5s ease;
 }
 #actions.on { opacity: 1; pointer-events: auto; transform: translateX(-50%); }
-#actions.top { top: calc(64px + env(safe-area-inset-top)); bottom: auto; }
+#actions.top { top: calc(112px + env(safe-area-inset-top)); bottom: auto; }
 #actions.top button { font-size: 14px; padding: 8px 16px; }
 #actions button {
   appearance: none; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer; white-space: nowrap;
@@ -135,8 +135,54 @@ canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block;
 .recipe .r-needs { font-size: 13px; color: var(--ink-soft); margin-top: 3px; }
 .recipe .r-needs b { font-weight: 500; color: var(--ember); }
 .drop-btn {
-  appearance: none; margin-top: 12px; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer;
+  appearance: none; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer;
   padding: 9px 26px; border-radius: 999px; border: 1px solid rgba(244, 233, 218, 0.25); background: rgba(244, 233, 218, 0.06);
   transition: opacity 0.3s ease, background 0.3s ease;
 }
 .drop-btn:disabled { opacity: 0.35; cursor: default; }
+.sheet-btns { display: flex; gap: 8px; margin-top: 12px; justify-content: center; }
+.drop-btn[hidden] { display: none; }
+#inv-slots { flex-wrap: wrap; justify-content: center; max-width: 300px; row-gap: 8px; }
+.slot-break { flex-basis: 100%; height: 0; }
+.slot[hidden] { display: none; }
+.slot.bag { border-style: dashed; }
+#inv-slots .slot.gap { margin-left: 0; }
+
+/* équipement */
+#equip-slots { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.slot.eq { width: 60px; height: 66px; padding: 6px 6px 18px; color: rgba(244, 233, 218, 0.38); }
+.slot.eq .eq-name { position: absolute; left: 0; right: 0; bottom: 4px; font-size: 10.5px; color: var(--ink-soft); text-align: center; }
+.slot.eq .eq-empty svg, .slot.eq .eq-item svg { width: 100%; height: 100%; display: block; }
+.slot.eq.filled .eq-empty { display: none; }
+.slot.eq.filled { color: var(--ink); border-color: rgba(233, 160, 97, 0.6); }
+
+/* soif et faim : deux petites jauges rondes en haut à gauche */
+#needs { position: fixed; top: calc(14px + env(safe-area-inset-top)); left: calc(14px + env(safe-area-inset-left)); display: flex; gap: 8px; }
+#needs[hidden] { display: none; }
+.need { width: 40px; height: 40px; border-radius: 50%; background: rgba(20, 13, 9, 0.35); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.need svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
+.need .track { fill: none; stroke: rgba(244, 233, 218, 0.14); stroke-width: 3; }
+.need .bar { fill: none; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 94.25; transition: stroke-dashoffset 1s ease, stroke 1s ease; }
+#need-soif .bar { stroke: #79b8de; }
+#need-faim .bar { stroke: #d9b46a; }
+.need.low .bar { stroke: #e08a6a; }
+.need .ico { transform: rotate(90deg); transform-origin: 18px 18px; }
+#need-soif .ico { fill: #cfe5f2; }
+#need-faim .ico { fill: #ecd9ad; stroke: #ecd9ad; stroke-width: 1.2; stroke-linecap: round; }
+#needs.flash .need { box-shadow: 0 0 0 1px rgba(244, 233, 218, 0.35); }
+
+/* fin de partie */
+#gameover {
+  position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; z-index: 20;
+  background: radial-gradient(ellipse at 50% 40%, rgba(40, 26, 18, 0.55), rgba(20, 13, 9, 0.92));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  opacity: 0; transition: opacity 2.5s ease;
+}
+#gameover[hidden] { display: none; }
+#gameover.on { opacity: 1; }
+#gameover h1 { font-size: 30px; }
+#go-time { margin: 0 0 28px; color: var(--ink-soft); font-size: 15px; line-height: 1.5; }
+#btn-newgame {
+  appearance: none; border: 1px solid rgba(233, 160, 97, 0.55); cursor: pointer;
+  background: rgba(233, 160, 97, 0.16); color: var(--ink); font: inherit; font-size: 17px; padding: 12px 34px; border-radius: 999px;
+}

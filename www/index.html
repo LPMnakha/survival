@@ -35,6 +35,9 @@
     <button id="btn-inv" class="hud-icon" aria-label="Inventaire">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M8.5 7V5.8A3.5 3.5 0 0 1 15.5 5.8V7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M5 8.5c0-.8.7-1.5 1.5-1.5h11c.8 0 1.5.7 1.5 1.5L18.3 19a2 2 0 0 1-2 1.8H7.7a2 2 0 0 1-2-1.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
     </button>
+    <button id="btn-equipment" class="hud-icon" aria-label="Équipement">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9 4 4.5 6.5l2 4L8.5 9.6V20h7V9.6l2 .9 2-4L15 4a3 3 0 0 1-6 0z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    </button>
     <div id="quick"></div>
     <button id="btn-craft" class="hud-icon" aria-label="Fabriquer">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M13.5 6.5l4-2 2 2-2 4-1.8.3-6.9 6.9a1.6 1.6 0 0 1-2.3-2.3l6.9-6.9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 5l3.2 3.2M4.5 8.6 8.6 4.5M14 14l5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -44,9 +47,34 @@
   <div id="inv-sheet" class="sheet" role="dialog" aria-label="Inventaire">
     <p class="sheet-title">Inventaire</p>
     <div id="inv-slots"></div>
-    <button id="btn-drop" class="drop-btn" disabled>Jeter</button>
+    <div class="sheet-btns">
+      <button id="btn-drop" class="drop-btn" disabled>Jeter</button>
+      <button id="btn-equip" class="drop-btn" hidden>Équiper</button>
+    </div>
     <p class="sheet-hint">Les 3 premières cases sont l’accès rapide. Touche une case puis une autre pour les échanger, ou « Jeter » pour poser un objet au sol.</p>
     <button class="sheet-close">Fermer</button>
+  </div>
+
+  <div id="equip-sheet" class="sheet" role="dialog" aria-label="Équipement">
+    <p class="sheet-title">Équipement</p>
+    <div id="equip-slots"></div>
+    <div class="sheet-btns"><button id="btn-unequip" class="drop-btn" disabled>Retirer</button></div>
+    <p class="sheet-hint" id="equip-hint"></p>
+    <button class="sheet-close">Fermer</button>
+  </div>
+
+  <div id="needs" hidden aria-label="Soif et faim">
+    <div class="need" id="need-soif"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="track" cx="18" cy="18" r="15"/><circle class="bar" cx="18" cy="18" r="15"/><path class="ico" d="M18 9.5c3 4 5 6.6 5 9.4a5 5 0 0 1-10 0c0-2.8 2-5.4 5-9.4z"/></svg></div>
+    <div class="need" id="need-faim"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="track" cx="18" cy="18" r="15"/><circle class="bar" cx="18" cy="18" r="15"/><g class="ico"><path d="M18 26V12"/><path d="M18 14c-2.6-.3-3.8-1.8-4-4 2.5.2 3.7 1.6 4 4zm0 0c2.6-.3 3.8-1.8 4-4-2.5.2-3.7 1.6-4 4zM18 18c-2.6-.3-3.8-1.8-4-4 2.5.2 3.7 1.6 4 4zm0 0c2.6-.3 3.8-1.8 4-4-2.5.2-3.7 1.6-4 4zM18 22c-2.6-.3-3.8-1.8-4-4 2.5.2 3.7 1.6 4 4zm0 0c2.6-.3 3.8-1.8 4-4-2.5.2-3.7 1.6-4 4z"/></g></svg></div>
+  </div>
+
+  <div id="gameover" hidden>
+    <div class="card">
+      <h1>Tu n’as pas survécu</h1>
+      <p class="sub" id="go-cause"></p>
+      <p id="go-time"></p>
+      <button id="btn-newgame">Nouvelle partie</button>
+    </div>
   </div>
 
   <div id="craft-sheet" class="sheet" role="dialog" aria-label="Fabriquer">

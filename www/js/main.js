@@ -10,6 +10,11 @@ import { createGroundItems } from './items.js';
 import { createHands } from './hands.js';
 import { createCampfires } from './campfire.js';
 import { createUI } from './ui.js';
+import { createPlaces } from './places.js';
+import { createBerries } from './berries.js';
+import { createNeeds, fmtDuration } from './needs.js';
+import { createRain } from './rain.js';
+import { createCollectors } from './collector.js';
 
 const mobile = matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const canvas = document.getElementById('c');
@@ -59,10 +64,37 @@ const hands = createHands({ camera, controls });
 const inventory = createInventory({ saved: saved.inv, onChange: () => { hands.setHeld(inventory.heldType()); changed(); } });
 hands.setHeld(inventory.heldType());
 const items = createGroundItems(scene, { forest, saved: saved.items, onChange: changed });
-let ui = null;
-const campfires = createCampfires(scene, { forest, inventory, hands, getAudio: () => audio, hint: (t) => ui?.hint(t), onChange: changed, saved: saved.fires });
-ui = createUI({ canvas, camera, controls, inventory, items, campfires, hands, getAudio: () => audio });
-saver = createSaver({ inv: inventory.data, items: items.data, fires: campfires.data });
+createPlaces(scene, { forest, items, shadows: true });
+const berries = createBerries(scene, { forest, season, saved: saved.berries, onChange: changed });
+const rain = createRain();
+let ui = null, collectors = null;
+const hint = (t, ms) => ui?.hint(t, ms);
+const campfires = createCampfires(scene, { forest, inventory, hands, getAudio: () => audio, hint, onChange: changed, saved: saved.fires, others: () => collectors?.sites || [] });
+collectors = createCollectors(scene, { forest, inventory, hands, rain, getAudio: () => audio, hint, onChange: changed, saved: saved.cols, others: () => campfires.sites });
+
+// ---------- soif, faim, fin de partie (mort définitive)
+const gameover = document.getElementById('gameover');
+let over = false;
+function gameOver(dead, instant = false) {
+  if (over) return;
+  over = true;
+  controls.state.enabled = false;
+  saver?.now();
+  document.getElementById('go-cause').textContent = dead.cause === 'soif' ? 'Morte de soif.' : 'Morte de faim.';
+  document.getElementById('go-time').textContent = `Tu as tenu ${fmtDuration(dead.at - needs.start)} dans la forêt.`;
+  gameover.hidden = false;
+  if (instant) gameover.classList.add('on'); else requestAnimationFrame(() => gameover.classList.add('on'));
+  for (const id of ['hud', 'needs', 'sound']) document.getElementById(id).hidden = true;
+  document.getElementById('intro').classList.add('gone');
+  for (const s of document.querySelectorAll('.sheet')) s.classList.remove('on');
+  document.getElementById('actions').classList.remove('on');
+}
+const needs = createNeeds({ saved: saved.needs, onDeath: (d) => setTimeout(() => gameOver(d)) });
+document.getElementById('btn-newgame').addEventListener('click', () => { saver.reset(); location.reload(); });
+
+ui = createUI({ canvas, camera, controls, inventory, items, campfires, collectors, berries, needs, forest, hands, getAudio: () => audio });
+saver = createSaver({ inv: inventory.data, items: items.data, fires: campfires.data, cols: collectors.data, berries: berries.data, needs: needs.data });
+if (needs.dead) gameOver(needs.dead, true);
 
 // météo en direct à Annecy (affichée discrètement sur l'écran d'accueil)
 const meteoLine = document.getElementById('meteo');
@@ -88,11 +120,16 @@ const soundBtn = document.getElementById('sound');
 document.getElementById('hint').textContent = mobile
   ? 'Pouce gauche pour marcher, glisse à droite pour regarder autour de toi.'
   : 'Flèches ou ZQSD pour marcher, clique-glisse pour regarder autour de toi.';
+{
+  const low = [needs.thirst < 0.25 && 'Tu as soif', needs.hunger < 0.25 && 'Tu as faim'].filter(Boolean);
+  if (low.length && !needs.dead) document.getElementById('hint').textContent += ` ${low.join(' et ')} : pense à ${needs.thirst < 0.25 ? 'boire' : 'manger'}.`;
+}
 document.getElementById('enter').addEventListener('click', async () => {
   intro.classList.add('gone');
   controls.state.enabled = true;
   soundBtn.hidden = false;
   document.getElementById('hud').hidden = false;
+  document.getElementById('needs').hidden = false;
   try {
     audio = audio || createForestAudio();
     await audio?.start();
@@ -148,6 +185,9 @@ function frame(now) {
   }
   lastStep = { x: p.x, z: p.z };
   items.update(dt, p);
+  berries.update(dt);
+  collectors.update(dt, p, camera, controls.state.yaw);
+  if (!over) needs.update(dt, hint);
   const fire = campfires.update(dt, p, camera, controls.state.yaw);
   ui.update(dt);
   if (audio) {
@@ -172,4 +212,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__survival = { forest, controls, sky, scene, camera, renderer, weather, inventory, items, hands, campfires, ui, saver, ready: true };
+window.__survival = { forest, controls, sky, scene, camera, renderer, weather, inventory, items, hands, campfires, collectors, berries, needs, rain, ui, saver, ready: true };

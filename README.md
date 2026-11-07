@@ -1,8 +1,8 @@
 # Survival
 
-Une forêt 3D à la première personne, où l'on ramasse de quoi faire un feu de camp.
+Une forêt 3D à la première personne où il faut survivre : boire, manger, faire du feu, fouiller des lieux abandonnés.
 
-- **La forêt** : épicéas et bouleaux, relief doux, clairières, rochers moussus, troncs couchés, fougères et un petit ruisseau qu'on traverse sur sept gués en pierres plates. Zone de 400 m de côté.
+- **La forêt** : épicéas et bouleaux, relief doux, clairières, rochers moussus, troncs couchés, fougères et un petit ruisseau qu'on traverse sur quinze gués en pierres plates. Zone de 800 m de côté.
 - **Jour et nuit réels** : la position du soleil est calculée pour Annecy, à l'heure actuelle (étoiles la nuit)
 - **Météo en direct à Annecy** (Open-Meteo) : nuages, pluie, neige au sol, brouillard, vent dans les arbres
 - **Saisons** : couleurs des arbres, de l'herbe et des fougères, feuilles mortes en automne, neige en hiver
@@ -10,14 +10,22 @@ Une forêt 3D à la première personne, où l'on ramasse de quoi faire un feu de
 
 ## Survivre
 
-- **Inventaire** : 5 cases (pas de sac au début), dont 3 d'accès rapide en bas de l'écran. Piles de 10 au plus. L'icône sac ouvre l'inventaire complet : touche une case puis une autre pour les échanger.
+- **Soif et faim** (jauges en haut à gauche), en temps réel, **même appli fermée** : 3 jours sans boire ou 14 jours sans manger, et c'est la fin. **Pas de deuxième chance** : la partie s'arrête, il faut en recommencer une.
+- **Boire** : il faut 1 L par jour. La bouteille (1 L) se remplit au récupérateur d'eau de pluie ; « Boire » prend 25 cl (environ 8 % de la jauge). L'eau du ruisseau n'est pas potable.
+- **Manger** : les baies des buissons (5 poignées par buisson, elles repoussent en une semaine, peu de buissons garnis en hiver). « Manger » une poignée remonte la faim de 3 %.
+- **Lieux abandonnés** à fouiller (le butin ne se trouve qu'une fois par partie) : une vieille cabane en rondins (bâche, bouteille), un campement abandonné (sacoche) et un mirador de chasse.
+- **Équipement** (icône t-shirt) : tête, haut, bas, chaussures, sac. La sacoche se met dans la case sac et ajoute 3 cases à l'inventaire.
+- **Récupérateur d'eau de pluie** (Fabriquer) : 1 bâche, 4 bâtons, 4 cailloux. Il recueille la pluie réelle d'Annecy (1 mm = 1 L), même appli fermée, jusqu'à 10 L.
+
+- **Inventaire** : 5 cases (8 avec la sacoche), dont 3 d'accès rapide en bas de l'écran. Piles de 10 au plus. L'icône sac ouvre l'inventaire complet : touche une case puis une autre pour les échanger.
 - **En main** : touche une case d'accès rapide pour prendre l'objet en main (ou le ranger).
 - **Jeter** : dans l’inventaire complet, sélectionne une case puis « Jeter » : la main pose un objet au sol devant toi, un par un. Il reste là et se ramasse à nouveau. La pierre à feu ne se jette pas.
+- Pour tester le récupérateur : `?meteo=pluie` simule une forte pluie (il se remplit en 10 min).
 - **Ramasser** : cailloux, brindilles et bâtons au sol. Approche-toi (moins de 2 m) et touche l'objet : tu te baisses pour le prendre. Ce qui est ramassé repousse ailleurs au bout de 10 à 20 min.
 - **Fabriquer** (icône outils) : *Petit feu de camp* = 8 cailloux, 10 brindilles, 4 bâtons. Place la preview au sol, puis touche-la pour poser les éléments un par un (cailloux en cercle, brindilles au centre, bâtons en tipi). « Démonter » rend ce qui a été posé.
 - **Allumer** : prends la pierre à feu en main et touche le feu. Le feu prend en 1 à 3 coups.
 - **Entretenir** : le feu brûle 10 min, chaque bâton ajoute 5 min (20 min de réserve au plus). Il faiblit avant de s'éteindre. Éteint, remets 3 brindilles puis rallume-le.
-- **Sauvegarde** sur l'appareil : inventaire, objets ramassés et feux. Le feu continue de brûler appli fermée.
+- **Sauvegarde** sur l'appareil : inventaire, équipement, objets ramassés et posés, feux, récupérateurs, jauges. Le feu brûle et la pluie tombe appli fermée.
 
 ## Jouer
 

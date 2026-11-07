@@ -8,7 +8,15 @@ export const ITEMS = {
   brindille: { one: 'brindille', many: 'brindilles', stack: 10 },
   baton: { one: 'bâton', many: 'bâtons', stack: 10 },
   'pierre-a-feu': { one: 'pierre à feu', many: 'pierres à feu', stack: 1 },
+  bache: { one: 'bâche', many: 'bâches', stack: 1 },
+  bouteille: { one: 'bouteille', many: 'bouteilles', stack: 1 },
+  sacoche: { one: 'sacoche', many: 'sacoches', stack: 1, wear: 'sac' },
+  baies: { one: 'poignée de baies', many: 'poignées de baies', stack: 10 },
 };
+// « un caillou », « une bâche »…
+const FEM = new Set(['brindille', 'pierre-a-feu', 'bache', 'bouteille', 'sacoche', 'baies']);
+export const anItem = (type) => (FEM.has(type) ? 'une ' : 'un ') + ITEMS[type].one;
+export const theItem = (type) => (FEM.has(type) ? 'cette ' : type === 'baies' ? 'ces ' : 'ce ') + ITEMS[type].one;
 export const itemName = (type, n = 1) => (n > 1 ? ITEMS[type].many : ITEMS[type].one);
 
 // géométries posées à plat, centrées, axe long selon x
@@ -45,6 +53,40 @@ export function itemGeometry(type, variant = 0) {
     const rod = new THREE.CylinderGeometry(0.0075, 0.0075, 0.11, 6).translate(0, 0.075 + 0.055, 0);
     const hole = new THREE.TorusGeometry(0.007, 0.0025, 4, 6).rotateY(Math.PI / 2).translate(0, -0.004, 0);
     g = mergeColored([[handle, 0x8a5a36], [ring, 0x6b6f74], [rod, 0x3c3d42], [hole, 0x6b6f74]]);
+  } else if (type === 'bache') {
+    // bâche bleue pliée, avec ses œillets
+    const b = new THREE.BoxGeometry(0.34, 0.07, 0.26, 2, 1, 2);
+    const p = b.attributes.position;
+    for (let i = 0; i < p.count; i++) if (p.getY(i) > 0) p.setY(i, p.getY(i) - Math.abs(p.getX(i)) * 0.08);
+    b.computeVertexNormals();
+    b.translate(0, 0.035, 0);
+    const fold = new THREE.BoxGeometry(0.34, 0.012, 0.03).translate(0, 0.065, 0.06);
+    const e1 = new THREE.CylinderGeometry(0.012, 0.012, 0.008, 6).translate(0.15, 0.072, 0.11);
+    const e2 = new THREE.CylinderGeometry(0.012, 0.012, 0.008, 6).translate(-0.15, 0.072, 0.11);
+    g = mergeColored([[b, 0x3f7fb8], [fold, 0x356fa3], [e1, 0xc8ccd0], [e2, 0xc8ccd0]]);
+  } else if (type === 'bouteille') {
+    // bouteille en plastique (axe selon +y), bouchon bleu
+    const body = new THREE.CylinderGeometry(0.036, 0.036, 0.2, 8).translate(0, 0.1, 0);
+    const shoulder = new THREE.CylinderGeometry(0.014, 0.036, 0.05, 8).translate(0, 0.225, 0);
+    const neck = new THREE.CylinderGeometry(0.014, 0.014, 0.02, 8).translate(0, 0.26, 0);
+    const cap = new THREE.CylinderGeometry(0.016, 0.016, 0.018, 8).translate(0, 0.278, 0);
+    const label = new THREE.CylinderGeometry(0.0365, 0.0365, 0.07, 8).translate(0, 0.11, 0);
+    g = mergeColored([[body, 0xbfd8e2], [shoulder, 0xbfd8e2], [neck, 0xbfd8e2], [cap, 0x2d6fb3], [label, 0xe9e3d3]]);
+  } else if (type === 'sacoche') {
+    // petite sacoche en toile, rabat et bandoulière
+    const bag = new THREE.BoxGeometry(0.26, 0.18, 0.09).translate(0, 0.09, 0);
+    const flap = new THREE.BoxGeometry(0.265, 0.09, 0.095).translate(0, 0.15, 0.003);
+    const buckle = new THREE.BoxGeometry(0.03, 0.03, 0.01).translate(0, 0.11, 0.05);
+    const strap = new THREE.TorusGeometry(0.15, 0.008, 4, 10, Math.PI).translate(0, 0.18, 0);
+    g = mergeColored([[bag, 0x6b5a3e], [flap, 0x5e4e35], [buckle, 0xb8a170], [strap, 0x4d3f2b]]);
+  } else if (type === 'baies') {
+    // une poignée de baies rouges sur leurs feuilles
+    const parts = [[new THREE.IcosahedronGeometry(0.05, 0).scale(1.3, 0.25, 1).translate(0, 0.01, 0), 0x4f7a37]];
+    for (let k = 0; k < 9; k++) {
+      const a = k * 2.4, r = 0.012 + (k % 3) * 0.012;
+      parts.push([new THREE.IcosahedronGeometry(0.011, 0).translate(Math.cos(a) * r, 0.024 + (k % 2) * 0.01, Math.sin(a) * r), k % 4 ? 0xb3263a : 0x8e1c34]);
+    }
+    g = mergeColored(parts);
   } else if (type === 'grattoir') {
     const plate = new THREE.BoxGeometry(0.06, 0.03, 0.004);
     const edge = new THREE.BoxGeometry(0.06, 0.005, 0.0045).translate(0, 0.015, 0);
@@ -56,12 +98,32 @@ export function itemGeometry(type, variant = 0) {
 
 export const itemMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true });
 export const metalMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.5, flatShading: true });
-export const matFor = (type) => (type === 'pierre-a-feu' || type === 'grattoir' ? metalMaterial : itemMaterial);
+export const plasticMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, flatShading: true });
+export const matFor = (type) => (type === 'pierre-a-feu' || type === 'grattoir' ? metalMaterial : type === 'bouteille' || type === 'bache' ? plasticMaterial : itemMaterial);
 
 // petites icônes (SVG en ligne) pour l'inventaire
 export const ICONS = {
   caillou: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 21.5 9 13l7-4 8 2.5 3.5 7-2.5 5.5H10z" fill="#a39e95"/><path d="M9 13l7-4 8 2.5-6 3.5z" fill="#c4bfb5"/><path d="M18 14.5l9.5 4L25 24h-7z" fill="#857f77"/></svg>',
   brindille: '<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="#b08a62" stroke-linecap="round"><path d="M5 25 27 8" stroke-width="2.2"/><path d="M13 19l-2-6M19 14.5l5 1.5M9 22.5l-4.5-1" stroke-width="1.5"/></g></svg>',
   baton: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4.5 25.5 25 5" stroke="#7a5e45" stroke-width="5" stroke-linecap="round"/><circle cx="25" cy="5" r="2.2" fill="#c49c6e"/><path d="M14 15.5l3.5 3" stroke="#6a5038" stroke-width="2" stroke-linecap="round"/></svg>',
+  bache: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 11.5 16 8l11 3.5v9L16 24 5 20.5z" fill="#3f7fb8"/><path d="M5 11.5 16 8l11 3.5L16 15z" fill="#5a98cc"/><circle cx="7.5" cy="13" r="1.1" fill="#d6dade"/><circle cx="24.5" cy="13" r="1.1" fill="#d6dade"/></svg>',
+  sacoche: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 12a7 7 0 0 1 14 0" fill="none" stroke="#5e4e35" stroke-width="2"/><rect x="6" y="12" width="20" height="14" rx="3" fill="#7a6747"/><path d="M6 15a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v3H6z" fill="#665538"/><rect x="14.5" y="16.5" width="3" height="3" rx=".6" fill="#c9b27e"/></svg>',
+  baies: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 22c3-8 9-12 18-13-3 7-9 11-18 13z" fill="#5f8f42"/><g fill="#c2304a"><circle cx="11" cy="19" r="3.2"/><circle cx="16.5" cy="21.5" r="3"/><circle cx="14" cy="15" r="2.8"/><circle cx="19.5" cy="16.5" r="2.6"/></g><g fill="#f4b3bd"><circle cx="10" cy="18" r=".8"/><circle cx="15.6" cy="20.6" r=".7"/><circle cx="13.2" cy="14.2" r=".7"/></g></svg>',
   'pierre-a-feu': '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="13" y="16" width="6.5" height="12" rx="2.5" fill="#9a6a42"/><rect x="14.6" y="3.5" width="3.3" height="13" rx="1.2" fill="#55575e"/><g fill="#f0b46a"><circle cx="23" cy="6" r="1.1"/><circle cx="25.5" cy="10" r="0.8"/><circle cx="22" cy="11" r="0.7"/></g></svg>',
 };
+
+// bouteille : icône avec le niveau d'eau (0..1000 ml)
+export function bottleIcon(ml = 0) {
+  const k = Math.max(0, Math.min(1, ml / 1000)), top = 27 - 16 * k;
+  return `<svg viewBox="0 0 32 32" aria-hidden="true"><defs><clipPath id="bt"><path d="M12 11c0-1.5 1.5-2.5 2.5-3V6h3v2c1 .5 2.5 1.5 2.5 3v15a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z"/></clipPath></defs><path d="M12 11c0-1.5 1.5-2.5 2.5-3V6h3v2c1 .5 2.5 1.5 2.5 3v15a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z" fill="#cfe3ea" opacity=".55"/><rect x="11" y="${top.toFixed(1)}" width="10" height="${(28 - top).toFixed(1)}" fill="#5aa9d6" clip-path="url(#bt)"/><rect x="14" y="3.5" width="4" height="3" rx=".8" fill="#2d6fb3"/><path d="M12 11c0-1.5 1.5-2.5 2.5-3V6h3v2c1 .5 2.5 1.5 2.5 3v15a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z" fill="none" stroke="#e6f1f5" stroke-width="1"/></svg>`;
+}
+export const fmtWater = (ml) => (ml >= 1000 ? '1 L' : ml <= 0 ? 'vide' : `${Math.round(ml / 10)} cl`);
+
+// cases d'équipement (icônes au trait quand la case est vide)
+export const EQUIP_SLOTS = [
+  { id: 'tete', name: 'Tête', icon: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 20a8 8 0 0 1 16 0z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 20h20v3H6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="16" cy="10" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>' },
+  { id: 'haut', name: 'Haut', icon: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M12 6 6 9.5l2.5 5L11 13v13h10V13l2.5 1.5 2.5-5L20 6a4 4 0 0 1-8 0z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>' },
+  { id: 'bas', name: 'Bas', icon: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10 6h12l1.5 20h-4.5L16 13l-3 13H8.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>' },
+  { id: 'chaussures', name: 'Chaussures', icon: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 12h7l1 5 9 2.5c2 .6 3 2 3 3.5v1H6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6 21h20" stroke="currentColor" stroke-width="1.4"/></svg>' },
+  { id: 'sac', name: 'Sac', icon: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M11 10V8.5a5 5 0 0 1 10 0V10" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="8" y="10" width="16" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 17h10" stroke="currentColor" stroke-width="1.4"/></svg>' },
+];

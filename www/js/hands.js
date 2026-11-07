@@ -82,6 +82,9 @@ export function createHands({ camera, controls }) {
     else if (type === 'brindille') { arm.item.rotation.set(0, 0, Math.PI / 2 - 0.25); arm.item.position.set(0, 0.03, 0); }
     else if (type === 'baton') { arm.item.rotation.set(BATON.rx, BATON.ry, BATON.rz); arm.item.position.set(0, BATON.y, 0); }
     else if (type === 'pierre-a-feu') { arm.item.position.set(0, -0.035, 0); arm.item.rotation.set(-0.25, 0, 0); }
+    else if (type === 'bouteille') { arm.item.position.set(0, -0.09, 0.005); arm.item.rotation.set(0, 0, 0); }
+    else if (type === 'baies') { arm.item.position.set(0, 0.035, 0.01); arm.item.rotation.set(-0.3, 0, 0); }
+    else if (type === 'bache' || type === 'sacoche') { arm.item.position.set(0, -0.02, 0.06); arm.item.rotation.set(Math.PI / 2 - 0.2, 0, 0); }
     else if (type === 'grattoir') { arm.item.position.set(0.004, 0.012, 0.008); arm.item.rotation.set(0, Math.PI / 2, 0.3); }
   }
 
@@ -158,7 +161,9 @@ export function createHands({ camera, controls }) {
   async function pickup(target, type, onGrab) {
     showArm(null);
     R.pose.roll = 0; R.pose.tilt = 0;
-    const ctx = await begin(target, { crouch: 0.85, approach: 0.55 });
+    // on s'accroupit moins pour un objet posé en hauteur (étagère, table)
+    const above = target.y - controls.groundAt(target.x, target.z);
+    const ctx = await begin(target, { crouch: Math.max(0.05, Math.min(0.85, 0.85 - above * 0.75)), approach: 0.55 });
     const a = R.pose.p.clone(), b = reachTo(target);
     await tween(0.42, (k) => R.pose.p.lerpVectors(a, b, ease(k)));
     onGrab?.();
@@ -189,10 +194,64 @@ export function createHands({ camera, controls }) {
     restore();
   }
 
+  // remplir la bouteille : on s'approche, la main plonge la bouteille dans la poche d'eau, on attend qu'elle se remplisse
+  async function fill(target, onTouch, onDip) {
+    setItem(R, 'bouteille');
+    R.g.visible = true;
+    R.pose.roll = 0; R.pose.tilt = 0;
+    const ctx = await begin(target, { crouch: 0.55, approach: 0.8 });
+    const a = R.pose.p.clone(), b = reachTo(target);
+    await tween(0.45, (k) => { const e = ease(k); R.pose.p.lerpVectors(a, b, e); R.pose.tilt = lerp(0, 1.25, e); });
+    onDip?.();
+    await tween(1.0, (k) => { R.pose.p.y = b.y + Math.sin(k * Math.PI * 3) * 0.006; });
+    onTouch?.();
+    const c = R.pose.p.clone();
+    const endP = end(ctx, 0.5);
+    await tween(0.45, (k) => { const e = ease(k); R.pose.p.lerpVectors(c, POSE.rest, e); R.pose.tilt = lerp(1.25, REST.tilt, e); });
+    await endP;
+    restore();
+  }
+
+  // boire ou manger, debout : la main porte la bouteille (ou les baies) à la bouche
+  async function consume(type, onDone) {
+    busy = true;
+    st.frozen = true;
+    setItem(R, type);
+    R.g.visible = true;
+    const drink = type === 'bouteille';
+    const p0 = st.pitch, a = R.pose.p.clone(), t0 = R.pose.tilt, r0 = R.pose.roll;
+    const mouth = drink ? CONSUME.drink : CONSUME.eat;
+    await tween(0.55, (k) => {
+      const e = ease(k);
+      R.pose.p.lerpVectors(a, mouth.p, e);
+      R.pose.tilt = lerp(t0, mouth.tilt, e);
+      R.pose.roll = lerp(r0, mouth.roll, e);
+      st.pitch = lerp(p0, Math.min(0.6, p0 + mouth.look), e);
+    });
+    if (!drink) setItem(R, null);
+    await tween(drink ? 0.9 : 0.45, (k) => { if (!drink) R.pose.p.y = mouth.p.y - Math.sin(k * Math.PI * 2) * 0.008; });
+    onDone?.();
+    const c = R.pose.p.clone(), t1 = R.pose.tilt, r1 = R.pose.roll, p1 = st.pitch;
+    await tween(0.5, (k) => {
+      const e = ease(k);
+      R.pose.p.lerpVectors(c, POSE.rest, e);
+      R.pose.tilt = lerp(t1, REST.tilt, e);
+      R.pose.roll = lerp(r1, REST.roll, e);
+      st.pitch = lerp(p1, p0, e);
+    });
+    st.frozen = false;
+    busy = false;
+    restore();
+  }
+
   // pierre à feu : à genoux près du feu, la main droite tient la tige pointée sur
   // les brindilles, la gauche gratte la tige vers le bas avec le grattoir
   const rodW = new THREE.Vector3();
   const REST = { tilt: 0.8, roll: 0.15 };
+  const CONSUME = {
+    drink: { p: new THREE.Vector3(0.06, -0.13, -0.3), tilt: -0.75, roll: 0.7, look: 0.3 },
+    eat: { p: new THREE.Vector3(0.04, -0.12, -0.19), tilt: 0.3, roll: 0.3, look: 0.08 },
+  };
   const BATON = { rx: 0, ry: -0.7, rz: 1.0, y: 0.04 };
   const STRIKE = { p: new THREE.Vector3(0.15, -0.13, -0.48), tilt: 1.2, roll: -0.9 };
   async function strike(target, attempts, onSpark) {
@@ -297,5 +356,5 @@ export function createHands({ camera, controls }) {
     renderer.render(scene, camera);
   }
 
-  return { update, render, pickup, place, strike, setHeld, get busy() { return busy; }, _arms: { R, L, root, scene, STRIKE, REST, BATON, setItem } };
+  return { update, render, pickup, place, strike, fill, consume, setHeld, get busy() { return busy; }, _arms: { R, L, root, scene, STRIKE, REST, BATON, CONSUME, setItem } };
 }

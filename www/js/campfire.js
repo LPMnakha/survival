@@ -40,7 +40,7 @@ const TINDER = PIECES.filter((p) => p.type === 'brindille').slice(0, FIRE.tinder
 const FUEL = [piece('baton', 0, 0, 0.07, 0, 0.1, 0.5, 0.06, 0.8), piece('baton', 0, 0, 0.1, 0, -0.08, 2.1, -0.05, 0.8)];
 const ASH = [[0, 0.02, 0, 0.16], [0.08, 0.025, -0.05, 0.1], [-0.07, 0.022, 0.06, 0.11]];
 
-export function createCampfires(scene, { forest, inventory, hands, getAudio, hint, onChange, saved }) {
+export function createCampfires(scene, { forest, inventory, hands, getAudio, hint, onChange, saved, others }) {
   const ghostMat = new THREE.MeshBasicMaterial({ color: 0xf4e9da, transparent: true, opacity: 0.2, depthWrite: false });
   const nextMat = new THREE.MeshBasicMaterial({ color: 0xffc27a, transparent: true, opacity: 0.5, depthWrite: false });
   const badMat = new THREE.MeshBasicMaterial({ color: 0xe0705a, transparent: true, opacity: 0.3, depthWrite: false });
@@ -212,7 +212,7 @@ export function createCampfires(scene, { forest, inventory, hands, getAudio, hin
     if (!forest.inWalk(x, z, -1.5)) return false;
     if (forest.streamDist(x, z) < 2.6) return false;
     if (forest.blocked(x, z, 0.7)) return false;
-    if (sites.some((s) => Math.hypot(s.x - x, s.z - z) < 2.4)) return false;
+    if (sites.some((s) => Math.hypot(s.x - x, s.z - z) < 2.4) || (others?.() || []).some((s) => Math.hypot(s.x - x, s.z - z) < 2.2)) return false;
     const h = forest.groundAt(x, z);
     return [[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]].every(([dx, dz]) => Math.abs(forest.groundAt(x + dx, z + dz) - h) < 0.22);
   }

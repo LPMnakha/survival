@@ -3,14 +3,15 @@
 // un objet ramassé repousse ailleurs au bout de 10 à 20 minutes.
 import * as THREE from '../vendor/three.module.min.js';
 import { makeNoise } from './noise.js';
-import { itemGeometry, itemMaterial } from './models.js';
+import { itemGeometry, itemMaterial, matFor } from './models.js';
 
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
+// carte de 800 m : environ 4 fois plus d'objets qu'avant ; brindilles deux fois plus denses
 const KINDS = {
-  brindille: { active: 1600, pool: 2600, start: 14, want: (d, cl) => 1 - cl * 0.7 },
-  caillou: { active: 1000, pool: 1700, start: 10, want: (d, cl) => 0.3 + 0.7 * smooth(9, 2, d) },
-  baton: { active: 800, pool: 1300, start: 7, want: (d, cl) => 1 - cl * 0.85 },
+  brindille: { active: 12800, pool: 18000, start: 28, want: (d, cl) => 1 - cl * 0.6 },
+  caillou: { active: 4000, pool: 6800, start: 10, want: (d, cl) => 0.3 + 0.7 * smooth(9, 2, d) },
+  baton: { active: 3200, pool: 5200, start: 7, want: (d, cl) => 1 - cl * 0.85 },
 };
 const RESPAWN = [10 * 60e3, 20 * 60e3];
 
@@ -19,7 +20,7 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   const spots = []; // { id, type, x, y, z, rot, variant, def, on, mesh, idx }
   const byType = { brindille: [], caillou: [], baton: [] };
   const sp = forest.spawn;
-  const ok = (x, z) => forest.inWalk(x, z, -2) && forest.streamDist(x, z) > 1.7 && !forest.blocked(x, z, 0.3);
+  const ok = (x, z) => forest.inWalk(x, z, -2) && forest.streamDist(x, z) > 1.7 && !forest.nearSite(x, z, 1) && !forest.blocked(x, z, 0.3);
   for (const [type, K] of Object.entries(KINDS)) {
     const list = byType[type];
     // quelques-uns près du point de départ, pour le premier feu
@@ -31,7 +32,7 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
     }
     g = 0;
     while (list.length < K.pool && g++ < K.pool * 40) {
-      const x = (R() * 2 - 1) * 196, z = (R() * 2 - 1) * 196;
+      const x = (R() * 2 - 1) * 396, z = (R() * 2 - 1) * 396;
       if (!ok(x, z) || R() > K.want(forest.streamDist(x, z), forest.clearingAt(x, z))) continue;
       list.push({ x, z });
     }
@@ -71,11 +72,26 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
     }
   }
 
+  // butin des lieux abandonnés : un objet posé à la main, ramassable une seule fois par partie
+  const lootTaken = new Set((saved && saved.loot) || []);
+  function addLoot(L) {
+    if (lootTaken.has(L.id)) return;
+    const mesh = new THREE.Mesh(itemGeometry(L.type, 0), matFor(L.type));
+    mesh.position.copy(L.p);
+    mesh.rotation.y = L.rot || 0;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    const s = { loot: L.id, type: L.type, x: L.p.x, y: L.p.y, z: L.p.z, rot: L.rot || 0, on: true, lootMesh: mesh, extra: L.extra };
+    gridAdd(s);
+  }
+
   // objets jetés par le joueur : restent où ils sont tombés, sans repousse
   const DROP_MAX = 200;
-  const droppedMesh = {}, dropped = { brindille: [], caillou: [], baton: [] };
-  for (const type of Object.keys(dropped)) {
-    const m = new THREE.InstancedMesh(itemGeometry(type, 0), itemMaterial, DROP_MAX);
+  const droppedMesh = {}, dropped = {};
+  for (const type of ['brindille', 'caillou', 'baton', 'bache', 'bouteille', 'sacoche', 'baies']) {
+    dropped[type] = [];
+    const m = new THREE.InstancedMesh(itemGeometry(type, 0), matFor(type), DROP_MAX);
     m.count = 0;
     m.frustumCulled = false;
     m.castShadow = true;
@@ -91,16 +107,16 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   };
   const gridAdd = (s) => { const k = key(s.x, s.z); if (!GRID.has(k)) GRID.set(k, []); GRID.get(k).push(s); };
   const gridRemove = (s) => { const L = GRID.get(key(s.x, s.z)); if (L) L.splice(L.indexOf(s), 1); };
-  function addDropped(type, x, z, rot, save = true) {
+  function addDropped(type, x, z, rot, save = true, extra) {
     if (dropped[type].length >= DROP_MAX) { const o = dropped[type].shift(); o.on = false; gridRemove(o); } // le plus ancien disparaît
-    const s = { dropped: true, type, x, z, y: forest.groundAt(x, z) + 0.05, rot, variant: 0, on: true };
+    const s = { dropped: true, type, x, z, y: forest.groundAt(x, z) + 0.05, rot, variant: 0, on: true, extra };
     dropped[type].push(s);
     gridAdd(s);
     refreshDropped(type);
     if (save) onChange?.();
     return s;
   }
-  for (const d of (saved && saved.dropped) || []) if (dropped[d.t] && Number.isFinite(d.x) && Number.isFinite(d.z)) addDropped(d.t, d.x, d.z, d.r || 0, false);
+  for (const d of (saved && saved.dropped) || []) if (dropped[d.t] && Number.isFinite(d.x) && Number.isFinite(d.z)) addDropped(d.t, d.x, d.z, d.r || 0, false, d.e);
   // où un objet jeté tombe : devant soi, sur un sol libre (ni ruisseau, ni tronc, ni rocher)
   function dropSpot(player, yaw) {
     for (const [dist, da] of [[0.75, 0], [0.75, 0.5], [0.75, -0.5], [0.55, 0.9], [0.55, -0.9], [1.0, 0.25], [1.0, -0.25], [0.45, 0]]) {
@@ -128,6 +144,14 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   }
 
   function take(s) {
+    if (s.loot) {
+      s.on = false;
+      gridRemove(s);
+      scene.remove(s.lootMesh);
+      lootTaken.add(s.loot);
+      onChange?.();
+      return;
+    }
     if (s.dropped) {
       s.on = false;
       gridRemove(s);
@@ -164,11 +188,11 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   }
 
   return {
-    pickAt, take, update, near, dropSpot,
-    drop: (type, x, z, rot) => addDropped(type, x, z, rot),
+    pickAt, take, update, near, dropSpot, addLoot,
+    drop: (type, x, z, rot, extra) => addDropped(type, x, z, rot, true, extra),
     data: () => ({
-      v: 1, off: spots.filter((s) => s.def && !s.on).map((s) => s.id), on: spots.filter((s) => !s.def && s.on).map((s) => s.id), pending,
-      dropped: Object.values(dropped).flat().map((s) => ({ t: s.type, x: +s.x.toFixed(2), z: +s.z.toFixed(2), r: +s.rot.toFixed(2) })),
+      v: 1, off: spots.filter((s) => s.def && !s.on).map((s) => s.id), on: spots.filter((s) => !s.def && s.on).map((s) => s.id), pending, loot: [...lootTaken],
+      dropped: Object.values(dropped).flat().map((s) => ({ t: s.type, x: +s.x.toFixed(2), z: +s.z.toFixed(2), r: +s.rot.toFixed(2), e: s.extra })),
     }),
   };
 }
