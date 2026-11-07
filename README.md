@@ -12,6 +12,7 @@ Une forêt 3D à la première personne, où l'on ramasse de quoi faire un feu de
 
 - **Inventaire** : 5 cases (pas de sac au début), dont 3 d'accès rapide en bas de l'écran. Piles de 10 au plus. L'icône sac ouvre l'inventaire complet : touche une case puis une autre pour les échanger.
 - **En main** : touche une case d'accès rapide pour prendre l'objet en main (ou le ranger).
+- **Jeter** : dans l’inventaire complet, sélectionne une case puis « Jeter » : la main pose un objet au sol devant toi, un par un. Il reste là et se ramasse à nouveau. La pierre à feu ne se jette pas.
 - **Ramasser** : cailloux, brindilles et bâtons au sol. Approche-toi (moins de 2 m) et touche l'objet : tu te baisses pour le prendre. Ce qui est ramassé repousse ailleurs au bout de 10 à 20 min.
 - **Fabriquer** (icône outils) : *Petit feu de camp* = 8 cailloux, 10 brindilles, 4 bâtons. Place la preview au sol, puis touche-la pour poser les éléments un par un (cailloux en cercle, brindilles au centre, bâtons en tipi). « Démonter » rend ce qui a été posé.
 - **Allumer** : prends la pierre à feu en main et touche le feu. Le feu prend en 1 à 3 coups.

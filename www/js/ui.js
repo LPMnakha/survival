@@ -62,6 +62,18 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
   craft.querySelector('.sheet-close').addEventListener('click', () => craft.classList.remove('on'));
   $('btn-inv').addEventListener('click', () => craft.classList.remove('on'));
   inventory.setLock(() => hands.busy);
+  // jeter un objet : la main le pose au sol devant soi, un par un
+  inventory.setDrop((i) => {
+    if (hands.busy || !st.enabled) return;
+    const spot = items.dropSpot(st.pos, st.yaw);
+    if (!spot) return hint('Pas de place ici pour poser un objet.');
+    const type = inventory.takeAt(i);
+    if (!type) return;
+    const rot = Math.random() * Math.PI * 2;
+    const target = { x: spot.x, y: controls.groundAt(spot.x, spot.z) + 0.05, z: spot.z };
+    hands.place(target, type, () => { items.drop(type, spot.x, spot.z, rot); getAudio()?.place(type); inventory.render(); });
+    inventory.render();
+  });
 
   // ------------------------------------------------------------------ toucher le monde
   // un toucher = appui court sans glisser (sinon c'est regarder ou marcher)
@@ -101,8 +113,10 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
   }
 
   // ------------------------------------------------------------------ chaque image : boutons et indice selon la situation
-  let timer = 0;
+  let timer = 0, wasBusy = false;
   function update(dt) {
+    // le bouton « Jeter » redevient actif à la fin du geste
+    if (hands.busy !== wasBusy) { wasBusy = hands.busy; inventory.render(); }
     timer -= dt;
     if (timer > 0) return;
     timer = 0.2;

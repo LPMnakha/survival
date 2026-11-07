@@ -40,6 +40,15 @@ export function createInventory({ saved, onChange }) {
     changed();
     return true;
   }
+  // retire un objet d'une case précise (pour jeter)
+  function takeAt(i) {
+    const s = slots[i];
+    if (!s) return null;
+    const type = s.type;
+    if (--s.n <= 0) { slots[i] = null; if (held === i) held = -1; }
+    changed();
+    return type;
+  }
   const heldType = () => (held >= 0 && slots[held] ? slots[held].type : null);
   function toggleHeld(i) {
     held = held === i ? -1 : i;
@@ -55,7 +64,8 @@ export function createInventory({ saved, onChange }) {
 
   // ------------------------------------------------------------------ interface
   const $ = (id) => document.getElementById(id);
-  const quick = $('quick'), full = $('inv-slots'), sheet = $('inv-sheet');
+  const quick = $('quick'), full = $('inv-slots'), sheet = $('inv-sheet'), dropBtn = $('btn-drop');
+  let onDrop = null;
   const slotHTML = (s) => s ? `${ICONS[s.type]}${ITEMS[s.type].stack > 1 ? `<span class="qty">${s.n}</span>` : ''}` : '';
   const label = (s) => (s ? `${s.n} ${itemName(s.type, s.n)}` : 'case vide');
   let sel = -1;
@@ -90,18 +100,28 @@ export function createInventory({ saved, onChange }) {
       b.classList.toggle('sel', i === sel);
       b.setAttribute('aria-label', label(slots[i]));
     });
+    // « Jeter » : une case sélectionnée avec un objet qu'on peut jeter (pas la pierre à feu)
+    if (sel >= 0 && !slots[sel]) sel = -1;
+    const s = sel >= 0 ? slots[sel] : null;
+    dropBtn.disabled = !s || s.type === 'pierre-a-feu' || locked();
+    dropBtn.textContent = s && s.type !== 'pierre-a-feu' ? `Jeter ${s.type === 'caillou' ? 'un caillou' : s.type === 'brindille' ? 'une brindille' : 'un bâton'}` : 'Jeter';
   }
   function open(on = !sheet.classList.contains('on')) {
     sel = -1;
     sheet.classList.toggle('on', on);
     render();
   }
+  dropBtn.addEventListener('click', () => {
+    if (dropBtn.disabled || !onDrop) return;
+    onDrop(sel);
+  });
   sheet.querySelector('.sheet-close').addEventListener('click', () => open(false));
   $('btn-inv').addEventListener('click', () => open());
   render();
 
   return {
-    count, canAdd, add, take, heldType, toggleHeld, swap, open, render,
+    count, canAdd, add, take, takeAt, heldType, toggleHeld, swap, open, render,
+    setDrop(fn) { onDrop = fn; },
     get held() { return held; },
     get slots() { return slots; },
     setLock(fn) { locked = fn; },

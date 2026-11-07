@@ -71,6 +71,46 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
     }
   }
 
+  // objets jetés par le joueur : restent où ils sont tombés, sans repousse
+  const DROP_MAX = 200;
+  const droppedMesh = {}, dropped = { brindille: [], caillou: [], baton: [] };
+  for (const type of Object.keys(dropped)) {
+    const m = new THREE.InstancedMesh(itemGeometry(type, 0), itemMaterial, DROP_MAX);
+    m.count = 0;
+    m.frustumCulled = false;
+    m.castShadow = true;
+    m.receiveShadow = true;
+    scene.add(m);
+    droppedMesh[type] = m;
+  }
+  const refreshDropped = (type) => {
+    const m = droppedMesh[type], L = dropped[type];
+    L.forEach((s, i) => { s.mesh = m; s.idx = i; m.setMatrixAt(i, m4.compose(v3.set(s.x, s.y, s.z), q.setFromAxisAngle(up, s.rot), one)); });
+    m.count = L.length;
+    m.instanceMatrix.needsUpdate = true;
+  };
+  const gridAdd = (s) => { const k = key(s.x, s.z); if (!GRID.has(k)) GRID.set(k, []); GRID.get(k).push(s); };
+  const gridRemove = (s) => { const L = GRID.get(key(s.x, s.z)); if (L) L.splice(L.indexOf(s), 1); };
+  function addDropped(type, x, z, rot, save = true) {
+    if (dropped[type].length >= DROP_MAX) { const o = dropped[type].shift(); o.on = false; gridRemove(o); } // le plus ancien disparaît
+    const s = { dropped: true, type, x, z, y: forest.groundAt(x, z) + 0.05, rot, variant: 0, on: true };
+    dropped[type].push(s);
+    gridAdd(s);
+    refreshDropped(type);
+    if (save) onChange?.();
+    return s;
+  }
+  for (const d of (saved && saved.dropped) || []) if (dropped[d.t] && Number.isFinite(d.x) && Number.isFinite(d.z)) addDropped(d.t, d.x, d.z, d.r || 0, false);
+  // où un objet jeté tombe : devant soi, sur un sol libre (ni ruisseau, ni tronc, ni rocher)
+  function dropSpot(player, yaw) {
+    for (const [dist, da] of [[0.75, 0], [0.75, 0.5], [0.75, -0.5], [0.55, 0.9], [0.55, -0.9], [1.0, 0.25], [1.0, -0.25], [0.45, 0]]) {
+      const j = () => (R() - 0.5) * 0.3; // un peu au hasard : les objets ne tombent pas pile au même endroit
+      const a = yaw + da, x = player.x - Math.sin(a) * dist + j(), z = player.z - Math.cos(a) * dist + j();
+      if (forest.streamDist(x, z) > 1.65 && !forest.blocked(x, z, 0.12) && forest.inWalk(x, z, -0.5)) return { x, z };
+    }
+    return null;
+  }
+
   // l'objet visé par un toucher : le plus proche du doigt à l'écran, parmi ceux à portée
   const p3 = new THREE.Vector3();
   function pickAt(camera, px, py, player, reach = 1.9, far = 7) {
@@ -88,6 +128,14 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   }
 
   function take(s) {
+    if (s.dropped) {
+      s.on = false;
+      gridRemove(s);
+      dropped[s.type].splice(dropped[s.type].indexOf(s), 1);
+      refreshDropped(s.type);
+      onChange?.();
+      return;
+    }
     s.on = false;
     show(s);
     pending.push({ type: s.type, at: Date.now() + RESPAWN[0] + R() * (RESPAWN[1] - RESPAWN[0]) });
@@ -116,7 +164,11 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   }
 
   return {
-    pickAt, take, update, near,
-    data: () => ({ v: 1, off: spots.filter((s) => s.def && !s.on).map((s) => s.id), on: spots.filter((s) => !s.def && s.on).map((s) => s.id), pending }),
+    pickAt, take, update, near, dropSpot,
+    drop: (type, x, z, rot) => addDropped(type, x, z, rot),
+    data: () => ({
+      v: 1, off: spots.filter((s) => s.def && !s.on).map((s) => s.id), on: spots.filter((s) => !s.def && s.on).map((s) => s.id), pending,
+      dropped: Object.values(dropped).flat().map((s) => ({ t: s.type, x: +s.x.toFixed(2), z: +s.z.toFixed(2), r: +s.rot.toFixed(2) })),
+    }),
   };
 }
