@@ -1,0 +1,65 @@
+:root {
+  --ink: #f4e9da;
+  --ink-soft: rgba(244, 233, 218, 0.72);
+  --ember: #e9a061;
+  --night: #1c140f;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  background: var(--night);
+  overscroll-behavior: none;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  font-family: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink);
+}
+canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+
+/* écran d'accueil */
+#intro {
+  position: fixed; inset: 0; display: grid; place-items: center;
+  background: radial-gradient(ellipse at 50% 40%, rgba(40, 26, 18, 0.35), rgba(20, 13, 9, 0.82));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  transition: opacity 2.2s ease, visibility 2.2s;
+  padding: 24px;
+}
+#intro.gone { opacity: 0; visibility: hidden; }
+.card { text-align: center; max-width: 340px; }
+.card h1 { font-weight: 600; font-size: 44px; letter-spacing: 0.04em; margin: 0; }
+.card .sub { margin: 6px 0 34px; color: var(--ink-soft); font-size: 17px; letter-spacing: 0.08em; }
+#enter {
+  appearance: none; border: 1px solid rgba(233, 160, 97, 0.55); cursor: pointer;
+  background: rgba(233, 160, 97, 0.16); color: var(--ink);
+  font: inherit; font-size: 18px; padding: 13px 44px; border-radius: 999px;
+  transition: background 0.4s ease;
+}
+#enter:hover, #enter:focus-visible { background: rgba(233, 160, 97, 0.28); outline: none; }
+#hint { margin-top: 26px; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+
+/* bouton son */
+#sound {
+  position: fixed; top: calc(14px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right));
+  width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer;
+  background: rgba(20, 13, 9, 0.35); color: var(--ink-soft);
+  display: grid; place-items: center;
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+}
+#sound .cross { display: none; }
+#sound.muted .wave { display: none; }
+#sound.muted .cross { display: inline; }
+
+/* joystick tactile */
+#joy {
+  position: fixed; width: 120px; height: 120px; margin: -60px 0 0 -60px;
+  border-radius: 50%; border: 1px solid rgba(244, 233, 218, 0.28);
+  background: rgba(244, 233, 218, 0.07);
+  opacity: 0; transition: opacity 0.25s ease; pointer-events: none;
+}
+#joy.on { opacity: 1; }
+#joy-knob {
+  position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(244, 233, 218, 0.35); transform: translate(-50%, -50%);
+}
+
+#meteo { margin-top: 10px; font-size: 13px; color: var(--ink-soft); opacity: 0; transition: opacity 1.2s ease; min-height: 1.2em; }
+#meteo.on { opacity: 0.85; }

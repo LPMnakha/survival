@@ -1,0 +1,14 @@
+{
+  "name": "survival",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Une forêt 3D où se promener.",
+  "scripts": {
+    "serve": "npx http-server www -p 8080 -c-1"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  }
+}
