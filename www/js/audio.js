@@ -1,5 +1,6 @@
 // Sons de la forêt, entièrement synthétisés (aucun fichier son) : pas selon le
-// sol, vent dans les arbres, oiseaux légers le jour, pluie, murmure du ruisseau.
+// sol, vent dans les arbres, oiseaux légers le jour, pluie, murmure du ruisseau,
+// feu de camp, gestes (ramasser, poser, pierre à feu).
 // Repris de Détente (bruit rose, pluie, vent, pas dehors), tout reste très doux.
 export function createForestAudio() {
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -113,6 +114,70 @@ export function createForestAudio() {
     }
   }, 250);
 
+  // ---------- feu de camp : souffle et petits craquements (repris de la cheminée de Détente)
+  const fireBus = ctx.createGain(); fireBus.gain.value = 0;
+  fireBus.connect(master);
+  const roarLp = ctx.createBiquadFilter(); roarLp.type = 'lowpass'; roarLp.frequency.value = 420;
+  const roarGain = ctx.createGain(); roarGain.gain.value = 0.35;
+  loop(1, 0.2).connect(roarLp).connect(roarGain).connect(fireBus);
+  const roarLfo = ctx.createOscillator(); roarLfo.frequency.value = 0.13;
+  const roarLfoG = ctx.createGain(); roarLfoG.gain.value = 0.12;
+  roarLfo.connect(roarLfoG).connect(roarGain.gain); roarLfo.start();
+  const pop = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.04), ctx.sampleRate);
+  const pd = pop.getChannelData(0);
+  for (let i = 0; i < pd.length; i++) pd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.004));
+  function crackle(t, strength, bus = fireBus) {
+    const s = ctx.createBufferSource();
+    s.buffer = pop;
+    s.playbackRate.value = 0.6 + Math.random() * 1.2;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = 1200 + Math.random() * 3200; f.Q.value = 0.8 + Math.random() * 2;
+    const g = ctx.createGain();
+    g.gain.value = strength * (0.15 + Math.random() * 0.5);
+    s.connect(f).connect(g).connect(bus);
+    s.start(t);
+  }
+  let fireLevel = 0, nextCrackle = 0;
+  const fireTimer = setInterval(() => {
+    const now = ctx.currentTime;
+    if (fireLevel < 0.01) { nextCrackle = now + 0.1; return; }
+    if (nextCrackle < now) nextCrackle = now + 0.05;
+    while (nextCrackle < now + 0.4) {
+      if (Math.random() < 0.12) { const n = 2 + Math.floor(Math.random() * 5); for (let i = 0; i < n; i++) crackle(nextCrackle + i * (0.015 + Math.random() * 0.05), 0.6); }
+      else crackle(nextCrackle, 0.45 + Math.random() * 0.4);
+      nextCrackle += 0.06 + Math.random() * Math.random() * 0.6;
+    }
+  }, 120);
+
+  // ---------- gestes : ramasser, poser, gratter la pierre à feu, le feu qui prend
+  function knock(t, f0, f1, dur, vol) {
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function handle(type, t) {
+    if (type === 'caillou') { knock(t, 1400, 900, 0.05, 0.05); burst(t, 0.04, 'bandpass', 2600, 2, 0.04); knock(t + 0.07, 1250, 850, 0.04, 0.03); }
+    else if (type === 'brindille') { for (let i = 0; i < 4; i++) burst(t + i * 0.02 + Math.random() * 0.01, 0.04, 'bandpass', 3200 + Math.random() * 2000, 1.4, 0.035); }
+    else if (type === 'baton') { knock(t, 230, 150, 0.12, 0.08); burst(t, 0.08, 'bandpass', 700, 3, 0.05); }
+    else burst(t, 0.12, 'lowpass', 800, 0.7, 0.04);
+  }
+  function scrape(t) {
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2.5;
+    f.frequency.setValueAtTime(3200, t); f.frequency.linearRampToValueAtTime(6200, t + 0.13);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    s.connect(f).connect(g).connect(master); s.start(t, Math.random() * 3); s.stop(t + 0.18);
+    for (let i = 0; i < 4; i++) crackle(t + 0.03 + i * 0.025, 0.25, master);
+  }
+  function whoosh(t) {
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass';
+    f.frequency.setValueAtTime(250, t); f.frequency.linearRampToValueAtTime(900, t + 0.9);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+    s.connect(f).connect(g).connect(master); s.start(t, Math.random() * 2); s.stop(t + 1.7);
+  }
+
   // ---------- pas : herbe (froissement), terre (sourd), feuilles (craquant), neige (crissement)
   let stepN = 0;
   function burst(at, dur, type, freq, q, g) {
@@ -153,6 +218,11 @@ export function createForestAudio() {
   let on = true;
   return {
     ctx, step,
+    pick(type) { handle(type, ctx.currentTime + 0.01); },
+    place(type) { handle(type, ctx.currentTime + 0.01); },
+    strike() { scrape(ctx.currentTime + 0.005); },
+    ignite() { whoosh(ctx.currentTime + 0.05); },
+    setFire(level) { fireLevel = level; fireBus.gain.setTargetAtTime(Math.min(1, level * 1.3), ctx.currentTime, 0.25); },
     async start() {
       if (ctx.state !== 'running') await ctx.resume();
       master.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 1.2);
@@ -173,6 +243,6 @@ export function createForestAudio() {
       return on;
     },
     get on() { return on; },
-    stop() { clearInterval(birdTimer); ctx.close(); },
+    stop() { clearInterval(birdTimer); clearInterval(fireTimer); ctx.close(); },
   };
 }

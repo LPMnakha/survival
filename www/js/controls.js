@@ -12,6 +12,8 @@ export function createControls(camera, dom, colliders, { eye = 1.6, radius = 0.2
     joy: { id: null, ox: 0, oy: 0, x: 0, y: 0 },
     look: { id: null, lx: 0, ly: 0 },
     enabled: false,
+    frozen: false, // pendant un geste (ramasser, poser, allumer) : on ne bouge pas
+    crouch: 0, // de combien on s'accroupit (m)
   };
   const SPEED = 1.7, LOOK = 0.0042;
 
@@ -48,7 +50,7 @@ export function createControls(camera, dom, colliders, { eye = 1.6, radius = 0.2
       st.joy.x = dx / JR;
       st.joy.y = dy / JR;
       joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-    } else if (e.pointerId === st.look.id) {
+    } else if (e.pointerId === st.look.id && !st.frozen) {
       const k = e.pointerType === 'mouse' ? LOOK : LOOK * 1.25;
       st.yaw -= (e.clientX - st.look.lx) * k;
       st.pitch -= (e.clientY - st.look.ly) * k;
@@ -85,7 +87,7 @@ export function createControls(camera, dom, colliders, { eye = 1.6, radius = 0.2
   const fwd = new THREE.Vector3(), right = new THREE.Vector3(), want = new THREE.Vector3();
   function update(dt) {
     let f = 0, s = 0;
-    if (st.enabled) {
+    if (st.enabled && !st.frozen) {
       if (st.keys.has('f')) f += 1;
       if (st.keys.has('b')) f -= 1;
       if (st.keys.has('r')) s += 1;
@@ -105,7 +107,7 @@ export function createControls(camera, dom, colliders, { eye = 1.6, radius = 0.2
     if (world.clamp) world.clamp(st.pos);
     const gy = world.ground ? world.ground(st.pos.x, st.pos.z) : 0;
     st.groundY = st.groundY === undefined ? gy : st.groundY + (gy - st.groundY) * (1 - Math.exp(-dt * 9));
-    st.pos.y = eye + st.groundY;
+    st.pos.y = eye - st.crouch + st.groundY;
     camera.position.copy(st.pos);
     camera.rotation.set(st.pitch, st.yaw, 0, 'YXZ');
   }

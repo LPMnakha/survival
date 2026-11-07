@@ -4,6 +4,12 @@ import { createControls } from './controls.js';
 import { createForestAudio } from './audio.js';
 import { createForest } from './forest.js';
 import { createWeather, seasonOf } from './weather.js';
+import { loadSave, createSaver } from './save.js';
+import { createInventory } from './inventory.js';
+import { createGroundItems } from './items.js';
+import { createHands } from './hands.js';
+import { createCampfires } from './campfire.js';
+import { createUI } from './ui.js';
 
 const mobile = matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const canvas = document.getElementById('c');
@@ -15,6 +21,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.autoClear = false; // les mains sont dessinées par-dessus le décor
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.05, 9000);
@@ -43,6 +50,20 @@ const controls = createControls(camera, canvas, forest.colliders, { start: { x: 
 controls.setWorld({ ground: forest.groundAt, clamp: forest.clamp });
 const clock = makeClock();
 
+// ---------- inventaire, objets au sol, mains, feux de camp (sauvegardés sur l'appareil)
+let audio = null;
+const saved = loadSave();
+let saver = null;
+const changed = () => saver?.soon();
+const hands = createHands({ camera, controls });
+const inventory = createInventory({ saved: saved.inv, onChange: () => { hands.setHeld(inventory.heldType()); changed(); } });
+hands.setHeld(inventory.heldType());
+const items = createGroundItems(scene, { forest, saved: saved.items, onChange: changed });
+let ui = null;
+const campfires = createCampfires(scene, { forest, inventory, hands, getAudio: () => audio, hint: (t) => ui?.hint(t), onChange: changed, saved: saved.fires });
+ui = createUI({ canvas, camera, controls, inventory, items, campfires, hands, getAudio: () => audio });
+saver = createSaver({ inv: inventory.data, items: items.data, fires: campfires.data });
+
 // météo en direct à Annecy (affichée discrètement sur l'écran d'accueil)
 const meteoLine = document.getElementById('meteo');
 const SAISONS = { printemps: 'printemps', ete: 'été', automne: 'automne', hiver: 'hiver' };
@@ -62,7 +83,6 @@ addEventListener('resize', resize);
 resize();
 
 // ---------- interface ----------
-let audio = null;
 const intro = document.getElementById('intro');
 const soundBtn = document.getElementById('sound');
 document.getElementById('hint').textContent = mobile
@@ -72,6 +92,7 @@ document.getElementById('enter').addEventListener('click', async () => {
   intro.classList.add('gone');
   controls.state.enabled = true;
   soundBtn.hidden = false;
+  document.getElementById('hud').hidden = false;
   try {
     audio = audio || createForestAudio();
     await audio?.start();
@@ -91,9 +112,10 @@ document.addEventListener('visibilitychange', () => {
 // ---------- boucle ----------
 let last = performance.now(), skyTimer = 0, t = 0;
 let lastStep = null, stepDist = 0, snowCover = 0;
+const handLight = { day: 1, sky: new THREE.Color(), sunColor: new THREE.Color(), sunIntensity: 0, sunDir: new THREE.Vector3(0, 1, 0), fire: 0, fireDir: new THREE.Vector3() };
 const birdSeason = season.name === 'hiver' ? 0.4 : season.name === 'automne' ? 0.7 : 1;
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
   last = now;
   t += dt;
 
@@ -125,14 +147,29 @@ function frame(now) {
     if (speed < 0.15) stepDist = Math.min(stepDist, 0.45); // premier pas rapide quand on repart
   }
   lastStep = { x: p.x, z: p.z };
+  items.update(dt, p);
+  const fire = campfires.update(dt, p, camera, controls.state.yaw);
+  ui.update(dt);
   if (audio) {
     const dB = forest.streamDist(p.x, p.z);
     audio.setAmbience({ rain: wNow.rain, wind: wNow.wind, snow: wNow.snow, day: sky.state.day, birds: birdSeason, brook: 1 / (1 + dB * dB * 0.012) });
+    audio.setFire(fire.level);
   }
+  // les mains, éclairées comme le décor (ciel, soleil, feu proche)
+  handLight.day = sky.state.day;
+  handLight.sky.copy(bounce.color);
+  handLight.sunColor.copy(sky.sun.color);
+  handLight.sunIntensity = sky.sun.visible ? sky.sun.intensity : 0;
+  handLight.sunDir.copy(sky.sun.position).sub(sky.sun.target.position).normalize();
+  handLight.fire = fire.hand;
+  handLight.fireDir.copy(fire.dir);
+  hands.update(dt, handLight);
 
+  renderer.clear();
   renderer.render(scene, camera);
+  hands.render(renderer);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
-window.__survival = { forest, controls, sky, scene, camera, renderer, weather, ready: true };
+window.__survival = { forest, controls, sky, scene, camera, renderer, weather, inventory, items, hands, campfires, ui, saver, ready: true };

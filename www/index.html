@@ -28,6 +28,32 @@
     </svg>
   </button>
 
+  <div id="hint-pill" aria-live="polite"></div>
+  <div id="actions"></div>
+
+  <div id="hud" hidden>
+    <button id="btn-inv" class="hud-icon" aria-label="Inventaire">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M8.5 7V5.8A3.5 3.5 0 0 1 15.5 5.8V7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M5 8.5c0-.8.7-1.5 1.5-1.5h11c.8 0 1.5.7 1.5 1.5L18.3 19a2 2 0 0 1-2 1.8H7.7a2 2 0 0 1-2-1.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+    <div id="quick"></div>
+    <button id="btn-craft" class="hud-icon" aria-label="Fabriquer">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M13.5 6.5l4-2 2 2-2 4-1.8.3-6.9 6.9a1.6 1.6 0 0 1-2.3-2.3l6.9-6.9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 5l3.2 3.2M4.5 8.6 8.6 4.5M14 14l5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <div id="inv-sheet" class="sheet" role="dialog" aria-label="Inventaire">
+    <p class="sheet-title">Inventaire</p>
+    <div id="inv-slots"></div>
+    <p class="sheet-hint">Les 3 premières cases sont l’accès rapide. Touche une case puis une autre pour les échanger.</p>
+    <button class="sheet-close">Fermer</button>
+  </div>
+
+  <div id="craft-sheet" class="sheet" role="dialog" aria-label="Fabriquer">
+    <p class="sheet-title">Fabriquer</p>
+    <div id="recipes"></div>
+    <button class="sheet-close">Fermer</button>
+  </div>
+
   <div id="intro">
     <div class="card">
       <h1>Survival</h1>
