@@ -122,7 +122,7 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
     const got = inventory.takeAt(i);
     if (!got) return;
     const rot = Math.random() * Math.PI * 2;
-    const target = { x: spot.x, y: controls.groundAt(spot.x, spot.z) + 0.05, z: spot.z };
+    const target = { x: spot.x, y: items.restY(got.type, spot.x, spot.z, rot), z: spot.z };
     hands.place(target, got.type, () => { items.drop(got.type, spot.x, spot.z, rot, got.extra); getAudio()?.place(got.type); inventory.render(); });
     inventory.render();
   });

@@ -16,8 +16,18 @@ const KINDS = {
   silex: { active: 420, pool: 700, start: 1, want: (d, cl) => 0.08 + 0.92 * smooth(6, 1.8, d) },
 };
 const RESPAWN = [10 * 60e3, 20 * 60e3];
+// demi-longueur de chaque objet posé à plat (selon x local) et s'il est fin (posé sur le sol, pas enfoncé)
+const FOOT = { feuille: [0.18, true], fibre: [0.15, true], brindille: [0.17, true], baton: [0.36, true], lance: [0.85, true], couteau: [0.1, true], corde: [0.06, true], carte: [0.09, true], bache: [0.17, true], baies: [0.05, true], bouteille: [0.04, false], sacoche: [0.13, false], caillou: [0.06, false], silex: [0.06, false] };
 
 export function createGroundItems(scene, { forest, saved, onChange }) {
+  // hauteur où poser un objet : au-dessus du sol dessiné sur toute sa longueur
+  function restY(type, x, z, rot) {
+    const [L, flat] = FOOT[type] || [0.05, false];
+    const c = Math.cos(rot), s = Math.sin(rot);
+    let h = forest.surfaceY(x, z);
+    for (const k of [-1, -0.5, 0.5, 1]) h = Math.max(h, forest.surfaceY(x + c * L * k, z - s * L * k));
+    return flat ? h + 0.008 : h - 0.012;
+  }
   const R = makeNoise(41).rnd;
   const spots = []; // { id, type, x, y, z, rot, variant, def, on, mesh, idx }
   const byType = { brindille: [], caillou: [], baton: [], silex: [] };
@@ -39,7 +49,8 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
       list.push({ x, z });
     }
     list.forEach((s, i) => {
-      Object.assign(s, { id: spots.length, type, y: forest.groundAt(s.x, s.z) + 0.05, rot: R() * Math.PI * 2, variant: type === 'caillou' || type === 'silex' ? Math.floor(R() * 3) : 0, s: 1, def: i < K.active, on: i < K.active });
+      const rot = R() * Math.PI * 2;
+      Object.assign(s, { id: spots.length, type, y: restY(type, s.x, s.z, rot), rot, variant: type === 'caillou' || type === 'silex' ? Math.floor(R() * 3) : 0, s: 1, def: i < K.active, on: i < K.active });
       spots.push(s);
     });
   }
@@ -111,7 +122,7 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   const gridRemove = (s) => { const L = GRID.get(key(s.x, s.z)); if (L) L.splice(L.indexOf(s), 1); };
   function addDropped(type, x, z, rot, save = true, extra) {
     if (dropped[type].length >= DROP_MAX) { const o = dropped[type].shift(); o.on = false; gridRemove(o); } // le plus ancien disparaît
-    const s = { dropped: true, type, x, z, y: forest.groundAt(x, z) + 0.05, rot, variant: 0, on: true, extra };
+    const s = { dropped: true, type, x, z, y: restY(type, x, z, rot), rot, variant: 0, on: true, extra };
     dropped[type].push(s);
     gridAdd(s);
     refreshDropped(type);
@@ -190,7 +201,7 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   }
 
   return {
-    pickAt, take, update, near, dropSpot, addLoot,
+    pickAt, take, update, near, dropSpot, addLoot, restY,
     drop: (type, x, z, rot, extra) => addDropped(type, x, z, rot, true, extra),
     data: () => ({
       v: 1, off: spots.filter((s) => s.def && !s.on).map((s) => s.id), on: spots.filter((s) => !s.def && s.on).map((s) => s.id), pending, loot: [...lootTaken],

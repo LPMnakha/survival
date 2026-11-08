@@ -780,6 +780,18 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
   // ------------------------------------------------------------------ où l'on peut marcher (murs invisibles, ruisseau, gués)
   const atCrossing = (z) => CROSSINGS.some((c) => Math.abs(z - c) < 1.0);
   const HW = 1.3; // demi-largeur du ruisseau qu'on ne traverse qu'aux gués
+  // hauteur exacte du sol tel qu'il est dessiné (tuiles détaillées) : les triangles passent
+  // parfois quelques centimètres au-dessus du relief calculé, entre deux sommets
+  function surfaceY(x, z) {
+    const tx = -IN + Math.floor((x + IN) / TS) * TS, tz = -IN + Math.floor((z + IN) / TS) * TS;
+    const nc = Math.round(TS / ST), st = TS / nc;
+    const i = Math.min(nc - 1, Math.floor((x - tx) / st)), j = Math.min(nc - 1, Math.floor((z - tz) / st));
+    const fx = (x - tx) / st - i, fz = (z - tz) / st - j;
+    const x0 = tx + i * st, z0 = tz + j * st;
+    const ha = height(x0, z0), hb = height(x0 + st, z0), hc = height(x0, z0 + st), hd = height(x0 + st, z0 + st);
+    if ((i + j) % 2) return fx + fz < 1 ? ha + (hb - ha) * fx + (hc - ha) * fz : hd + (hc - hd) * (1 - fx) + (hb - hd) * (1 - fz);
+    return fz > fx ? ha + (hd - hc) * fx + (hc - ha) * fz : ha + (hb - ha) * fx + (hd - hb) * fz;
+  }
   function groundAt(x, z) {
     const h = height(x, z) - 0.06;
     if (streamD(x, z) < 2.0 && atCrossing(z)) return Math.max(h, waterY(z) + 0.12);
@@ -861,7 +873,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
   }
 
   return {
-    update, groundAt, clamp, surfaceAt, colliders, streamDist: streamD, spawn: SPAWN,
+    update, groundAt, surfaceY, clamp, surfaceAt, colliders, streamDist: streamD, spawn: SPAWN,
     // pour les objets au sol et le feu de camp
     clearingAt, leafy, blocked, isFree: gClear, addLod, chunked, inWalk, addCollider, nearSite, sites: SITES, snowy,
     snowShown: () => snowShown, _lods: lods, _hidden: hiddenGroups, tiles, ferns: fernList, swayMaterial: sway, streamX,
