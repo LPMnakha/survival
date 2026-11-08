@@ -18,6 +18,7 @@ export function createInventory({ saved, onChange }) {
     const out = { type: s.type, n: Math.min(s.n, ITEMS[s.type].stack) };
     if (s.type === 'bouteille') out.w = Math.max(0, Math.min(1000, s.w || 0));
     if (PERISH[s.type]) out.t = dates({ ...s, n: out.n });
+    if (s.type === 'torche-allumee') out.end = Number.isFinite(s.end) ? s.end : Date.now();
     return out;
   };
   if (saved && Array.isArray(saved.slots)) {
@@ -36,7 +37,7 @@ export function createInventory({ saved, onChange }) {
     if (ITEMS[type].stack > 1) i = slots.findIndex((s, k) => k < cap() && s && s.type === type && s.n < ITEMS[type].stack);
     if (i < 0) i = slots.findIndex((s, k) => k < cap() && !s);
     if (i < 0) return false;
-    if (slots[i]) slots[i].n++; else slots[i] = { type, n: 1, ...(type === 'bouteille' ? { w: extra.w || 0 } : {}), ...(PERISH[type] ? { t: [] } : {}) };
+    if (slots[i]) slots[i].n++; else slots[i] = { type, n: 1, ...(type === 'bouteille' ? { w: extra.w || 0 } : {}), ...(PERISH[type] ? { t: [] } : {}), ...(type === 'torche-allumee' ? { end: extra.end || Date.now() } : {}) };
     if (PERISH[type]) { slots[i].t.push(extra.t && Number.isFinite(extra.t[0]) ? extra.t[0] : Date.now()); slots[i].t.sort((a, b) => a - b); }
     changed();
     return true;
@@ -60,7 +61,7 @@ export function createInventory({ saved, onChange }) {
   function takeAt(i) {
     const s = slots[i];
     if (!s) return null;
-    const out = { type: s.type, extra: s.type === 'bouteille' ? { w: s.w || 0 } : s.t ? { t: [s.t.shift()] } : undefined };
+    const out = { type: s.type, extra: s.type === 'bouteille' ? { w: s.w || 0 } : s.t ? { t: [s.t.shift()] } : s.type === 'torche-allumee' ? { end: s.end } : undefined };
     if (--s.n <= 0) { slots[i] = null; if (held === i) held = -1; }
     changed();
     return out;
@@ -82,6 +83,41 @@ export function createInventory({ saved, onChange }) {
     held = held === i ? -1 : i;
     changed();
   }
+  // une torche du tas tenu en main devient autre chose (enduite, allumée) :
+  // seule, elle change sur place ; prise dans un tas, l'allumée va dans une case
+  // d'accès rapide libre et passe en main, l'enduite rejoint l'inventaire
+  function canReplaceHeld(type) {
+    const s = slots[held];
+    if (!s) return false;
+    if (s.n === 1) return true;
+    return type === 'torche-allumee' ? slots.some((x, k) => k < QUICK && !x) : canAdd(type);
+  }
+  function replaceHeld(type, extra = {}) {
+    const s = slots[held];
+    if (!s || !canReplaceHeld(type)) return false;
+    if (s.n === 1) { slots[held] = { type, n: 1, ...extra }; changed(); return true; }
+    if (type === 'torche-allumee') {
+      const free = slots.findIndex((x, k) => k < QUICK && !x);
+      s.n--; slots[free] = { type, n: 1, ...extra }; held = free;
+      changed();
+      return true;
+    }
+    s.n--;
+    return add(type, extra);
+  }
+  // reprendre une torche allumée : elle va directement en main (case d'accès rapide libre)
+  const canHoldNew = () => slots.some((x, k) => k < QUICK && !x);
+  function addHeld(type, extra = {}) {
+    const free = slots.findIndex((x, k) => k < QUICK && !x);
+    if (free < 0) return false;
+    slots[free] = { type, n: 1, ...extra };
+    held = free;
+    changed();
+    return true;
+  }
+  // une torche allumée ne se range pas : elle reste en main
+  const litAt = (i) => slots[i]?.type === 'torche-allumee';
+  const LIT = 'Une torche allumée ne se range pas : garde-la en main ou plante-la (« Planter la torche »).';
   function swap(a, b) {
     [slots[a], slots[b]] = [slots[b], slots[a]];
     // ce qu'on a en main suit l'objet, tant qu'il reste dans l'accès rapide
@@ -129,7 +165,7 @@ export function createInventory({ saved, onChange }) {
     const b = document.createElement('button');
     b.className = 'slot';
     // la carte s'ouvre directement ; le reste se prend en main
-    b.addEventListener('click', () => { if (locked()) return; if (slots[i]?.type === 'carte') onRead?.(); else toggleHeld(i); });
+    b.addEventListener('click', () => { if (locked()) return; if (held >= 0 && litAt(held)) return onEquip?.(LIT); if (slots[i]?.type === 'carte') onRead?.(); else toggleHeld(i); });
     quick.appendChild(b);
   }
   for (let i = 0; i < MAX; i++) {
@@ -141,7 +177,7 @@ export function createInventory({ saved, onChange }) {
       if (locked()) return;
       if (sel < 0) sel = i;
       else if (sel === i) sel = -1;
-      else { const a = sel; sel = -1; swap(a, i); return; }
+      else { const a = sel; sel = -1; if (litAt(a) || litAt(i)) { render(); return onEquip?.(LIT); } swap(a, i); return; }
       render();
     });
     full.appendChild(b);
@@ -229,7 +265,7 @@ export function createInventory({ saved, onChange }) {
   render();
 
   return {
-    count, canAdd, add, take, takeAt, spoil, heldType, heldSlot, toggleHeld, swap, open, openEquip, render, equipFrom, unequip,
+    count, canAdd, add, take, takeAt, spoil, canReplaceHeld, replaceHeld, canHoldNew, addHeld, heldType, heldSlot, toggleHeld, swap, open, openEquip, render, equipFrom, unequip,
     setDrop(fn) { onDrop = fn; },
     setEquipMessage(fn) { onEquip = fn; },
     setRead(fn) { onRead = fn; },

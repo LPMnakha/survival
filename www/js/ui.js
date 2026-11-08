@@ -12,7 +12,7 @@ import { NEEDS } from './needs.js';
 
 const SIP = 250;
 
-export function createUI({ canvas, camera, controls, inventory, items, campfires, collectors, shelters, looms, berries, plants, rabbits, spears, needs, sleep, forest, hands, getAudio }) {
+export function createUI({ canvas, camera, controls, inventory, items, campfires, collectors, shelters, looms, torches, berries, plants, rabbits, spears, needs, sleep, forest, hands, getAudio }) {
   const $ = (id) => document.getElementById(id);
   const pill = $('hint-pill'), actions = $('actions'), craft = $('craft-sheet'), recipes = $('recipes');
   const st = controls.state;
@@ -58,7 +58,11 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
     { name: 'Couteau artisanal', needs: { silex: 2 }, out: 'couteau', icon: ico('couteau'), note: 'Pour couper les plantes : feuilles et fibres.' },
     { name: 'Corde', needs: { fibre: 2 }, out: 'corde', icon: ico('corde') },
     { name: 'Lance', needs: { baton: 1, corde: 1, couteau: 1 }, out: 'lance', icon: ico('lance'), note: 'La lame du couteau est ligaturée au bout du bâton.' },
+    { name: 'Torche', needs: { baton: 1, corde: 1, tissu: 1 }, out: 'torche', icon: ico('torche'), note: 'Le tissu est enroulé au bout du bâton et serré avec la corde. Trempe-la dans la sève d’un épicéa avant de l’allumer.' },
   ];
+  // une torche allumée occupe la main : il faut la planter pour faire autre chose
+  const torchLit = () => inventory.heldType() === 'torche-allumee';
+  const HANDS_FULL = 'Ta main tient la torche allumée : plante-la d’abord (« Planter la torche »).';
   const STRUCTS = [
     { recipe: RECIPE, mod: campfires, icon: fireIcon },
     { recipe: RECIPE2, mod: collectors, icon: rainIcon },
@@ -92,7 +96,7 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
   function renderRecipes() {
     recipes.innerHTML = '';
     const list = tab === 'outils' ? TOOLS.map((T) => ({ name: T.name, needs: T.needs, icon: T.icon, note: T.note, fn: () => craftTool(T) }))
-      : STRUCTS.map((S) => ({ name: S.recipe.name, needs: S.recipe.needs, icon: S.icon, fn: () => { craft.classList.remove('on'); inventory.open(false); S.mod.startPlacement(); hint('Choisis l’endroit, puis « Placer ici ».', 4000); } }));
+      : STRUCTS.map((S) => ({ name: S.recipe.name, needs: S.recipe.needs, icon: S.icon, fn: () => { if (torchLit()) return hint(HANDS_FULL); craft.classList.remove('on'); inventory.open(false); S.mod.startPlacement(); hint('Choisis l’endroit, puis « Placer ici ».', 4000); } }));
     for (const R of list) {
       const b = document.createElement('button');
       b.className = 'recipe' + (hasAll(R.needs) ? '' : ' missing');
@@ -104,6 +108,7 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
   // fabriquer un outil : on prend les ingrédients, les mains font le geste, l'outil arrive dans l'inventaire
   function craftTool(T) {
     if (hands.busy) return;
+    if (torchLit()) return hint(HANDS_FULL);
     if (!hasAll(T.needs)) {
       const miss = Object.entries(T.needs).filter(([t, n]) => inventory.count(t) < n).map(([t, n]) => `${n - inventory.count(t)} ${itemName(t, n - inventory.count(t))}`);
       return hint(`Il te manque ${miss.join(' et ')}.`);
@@ -118,11 +123,12 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
     hands.craft(T.out, () => {
       inventory.add(T.out);
       getAudio()?.crafted(T.out);
-      hint(`${T.name} fabriqué${T.out === 'corde' || T.out === 'lance' ? 'e' : ''}.`, 2500);
+      hint(`${T.name} fabriqué${T.out === 'corde' || T.out === 'lance' || T.out === 'torche' ? 'e' : ''}.`, 2500);
     });
   }
   $('btn-craft').addEventListener('click', () => {
     if (hands.busy) return;
+    if (torchLit()) return hint(HANDS_FULL);
     const on = !craft.classList.contains('on');
     inventory.open(false);
     inventory.openEquip(false);
@@ -136,6 +142,9 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
   // jeter un objet : la main le pose au sol devant soi, un par un
   inventory.setDrop((i) => {
     if (hands.busy || !st.enabled) return;
+    // jeter la torche allumée, c'est la planter dans le sol
+    if (inventory.slots[i]?.type === 'torche-allumee') { inventory.open(false); return torches.plant(st.pos, st.yaw); }
+    if (torchLit()) return hint(HANDS_FULL);
     const spot = items.dropSpot(st.pos, st.yaw);
     if (!spot) return hint('Pas de place ici pour poser un objet.');
     const got = inventory.takeAt(i);
@@ -255,14 +264,41 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
     if (!st.enabled || hands.busy || placingMod() || sleep.busy || looms.weaving) return;
     craft.classList.remove('on');
     const p = st.pos;
+    const ht = inventory.heldType();
     // feux de camp et récupérateurs
     for (const mod of builds) {
       const hit = mod.pickAt(camera, x, y, p);
       if (hit) {
         if (!hit.near) return hint('Approche-toi.');
+        if (mod === campfires && ht && ht.startsWith('torche')) {
+          const lit = hit.site.stage === 'lit';
+          if (ht === 'torche-allumee') return hint(lit ? 'Le feu brûle déjà.' : 'La torche ne peut pas allumer le feu : il faut la pierre à feu.');
+          if (ht === 'torche') return hint('Trempe d’abord la torche dans la sève d’un épicéa (une cavité dans le tronc).', 4000);
+          if (lit) return torches.lightFromFire(hit.site);
+          return hint('Ce feu n’est pas allumé.');
+        }
+        if (torchLit()) return hint(HANDS_FULL);
         mod.act(hit.site);
         return;
       }
+    }
+    // une torche plantée : on la reprend en main
+    const tp = torches.pickPlanted(camera, x, y, p);
+    if (tp) {
+      if (!tp.near) return hint('Approche-toi de la torche.');
+      return torches.takePlanted(tp.torch);
+    }
+    // un épicéa à sève : on y trempe la torche
+    const sap = torches.pickSap(camera, x, y, p);
+    if (sap && (ht === 'torche' || ht === 'torche-enduite')) {
+      if (!sap.near) return hint('Approche-toi de l’arbre.');
+      if (ht === 'torche-enduite') return hint('Cette torche est déjà enduite de sève.');
+      return torches.dip(sap.sap);
+    }
+    // la torche allumée occupe la main : le reste attend qu'on la plante
+    if (torchLit()) {
+      if (sap || spears.pickAt(camera, x, y, p) || rabbits.pickDead(camera, x, y, p) || items.pickAt(camera, x, y, p).spot || berries.pickAt(camera, x, y, p) || plants.pickAt(camera, x, y, p)) hint(HANDS_FULL);
+      return;
     }
     // une lance plantée : on la ramasse
     const sp = spears.pickAt(camera, x, y, p);
@@ -343,6 +379,7 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
       return;
     }
     if (plant && plant.near && P_HINT()) return hint(`Prends le couteau artisanal en main pour couper ${plants.name(plant.plant)}.`);
+    if (sap && sap.near) return hint('De la sève coule de cette cavité : de quoi enduire une torche.');
     // l'eau du ruisseau n'est pas potable
     if (inventory.heldType() === 'bouteille') {
       const g = groundUnder(x, y);
@@ -390,8 +427,10 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
       if (site && site.stage === 'build') setActions('demonter', [{ label: 'Démonter', fn: () => mod.dismantle(site) }], true);
       else if (!hands.busy && st.enabled && held && held.type === 'bouteille') setActions('boire' + (held.w > 0), [{ label: held.w > 0 ? 'Boire' : 'Bouteille vide', main: held.w > 0, fn: drink }]);
       else if (!hands.busy && st.enabled && held && (held.type === 'baies' || held.type === 'viande-cuite')) setActions('manger', [{ label: 'Manger', main: true, fn: eat }]);
+      else if (!hands.busy && st.enabled && held && held.type === 'torche-allumee') setActions('planter', [{ label: 'Planter la torche', main: true, fn: () => torches.plant(st.pos, st.yaw) }]);
+      else if (!hands.busy && st.enabled && held && held.type === 'torche-enduite') setActions('allumer', [{ label: 'Allumer', main: true, fn: () => torches.lightWithSteel() }]);
       else setActions('', []);
-      context = site && !hands.busy ? mod.label(site) : '';
+      context = site && !hands.busy ? mod.label(site) : !hands.busy ? torches.label(st.pos) : '';
     }
     // un message ponctuel passe avant l'indice de contexte
     if (now < hintUntil) return;

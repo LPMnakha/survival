@@ -22,8 +22,9 @@ Une forêt 3D à la première personne où il faut survivre : boire, manger, fai
 - **Carte** : touche-la dans l'inventaire pour l'ouvrir. On y écrit au doigt au crayon, la gomme efface ; les notes sont gardées.
 - **Silex** : rares, surtout dans le lit du ruisseau.
 - **Plantes** : couteau artisanal en main, touche une fougère (2 feuilles), des orties ou des joncs (1 fibre). Elles repoussent en 3 jours.
-- **Fabriquer** a deux onglets. **Outils** (faits dans les mains) : couteau artisanal (2 silex), corde (2 fibres), lance (1 bâton, 1 corde, 1 couteau artisanal, dont la lame est ligaturée au bout). **Structures** (posées au sol pièce par pièce) : petit feu de camp, récupérateur d'eau de pluie, abri de fortune (6 bâtons, 4 cordes, 20 feuilles, 4 cailloux, 2 peaux de lapin en matelas), métier à tisser (8 bâtons, 4 cordes).
+- **Fabriquer** a deux onglets. **Outils** (faits dans les mains) : couteau artisanal (2 silex), corde (2 fibres), lance (1 bâton, 1 corde, 1 couteau artisanal, dont la lame est ligaturée au bout), torche (1 bâton, 1 corde, 1 tissu en fibres naturelles). **Structures** (posées au sol pièce par pièce) : petit feu de camp, récupérateur d'eau de pluie, abri de fortune (6 bâtons, 4 cordes, 20 feuilles, 4 cailloux, 2 peaux de lapin en matelas), métier à tisser (8 bâtons, 4 cordes).
 - **Métier à tisser** : un cadre carré sur deux pieds en A, posé pièce par pièce. Touche-le pour choisir ce qu'on y fabrique. *Tissu en fibres naturelles* (6 cordes) : on tend d'abord 4 cordes de chaîne une par une, puis on s'assoit pour tisser les 2 cordes de trame. Le tissage n'avance que quand on est assis au métier : 30 min en tout, on peut s'arrêter (« Arrêter ») et reprendre plus tard, le bout de tissu grandit sur le cadre. Fini, il va dans l'inventaire.
+- **Torche** : avant de l'allumer, il faut la tremper dans la sève. Certains épicéas ont une cavité dans le tronc, d'où coule de la résine ambrée (sève illimitée) : torche en main, touche la cavité. On l'allume ensuite avec la pierre à feu (bouton « Allumer », 1 à 3 coups) ou en la tendant dans un feu de camp allumé (une torche n'allume pas un feu). Elle brûle 1 h, même appli fermée, et éclaire autour de soi ; la pluie ne l'éteint pas. **Allumée, elle ne se range pas** : on la garde en main ou on la plante dans le sol (« Planter la torche » ou « Jeter »), et on la reprend en la touchant. Éteinte, il reste le bâton.
 - **Équipement** (icône t-shirt) : tête, haut, bas, chaussures, sac. La sacoche se met dans la case sac et ajoute 3 cases à l'inventaire.
 - **Récupérateur d'eau de pluie** (Fabriquer) : 1 bâche, 4 bâtons, 4 cailloux. Il recueille la pluie réelle d'Annecy (1 mm = 1 L), même appli fermée, jusqu'à 10 L.
 
@@ -35,7 +36,7 @@ Une forêt 3D à la première personne où il faut survivre : boire, manger, fai
 - **Fabriquer** (icône outils) : *Petit feu de camp* = 8 cailloux, 10 brindilles, 4 bâtons. Place la preview au sol, puis touche-la pour poser les éléments un par un (cailloux en cercle, brindilles au centre, bâtons en tipi). « Démonter » rend ce qui a été posé.
 - **Allumer** : prends la pierre à feu en main et touche le feu. Le feu prend en 1 à 3 coups.
 - **Entretenir** : le feu brûle 10 min, chaque bâton ajoute 5 min (20 min de réserve au plus). Il faiblit avant de s'éteindre. Éteint, remets 3 brindilles puis rallume-le.
-- **Sauvegarde** sur l'appareil : position, inventaire, équipement, objets ramassés et posés, feux, récupérateurs, abris, métiers à tisser et tissage en cours, plantes coupées, notes sur la carte, jauges. Le feu brûle et la pluie tombe appli fermée.
+- **Sauvegarde** sur l'appareil : position, inventaire, équipement, objets ramassés et posés, feux, récupérateurs, abris, métiers à tisser et tissage en cours, torches plantées, plantes coupées, notes sur la carte, jauges. Le feu brûle et la pluie tombe appli fermée.
 
 ## Jouer
 

@@ -283,7 +283,7 @@ export function createForestAudio() {
     pour() { pourSound(ctx.currentTime); },
     drink() { gulps(ctx.currentTime + 0.05); },
     eat() { crunch(ctx.currentTime + 0.02); },
-    tick(kind) { const t = ctx.currentTime + 0.005; if (kind === 'knap') knap(t); else if (kind === 'skin') { burst(t, 0.18, 'bandpass', 900, 1, 0.04); burst(t + 0.05, 0.12, 'highpass', 2500, 0.8, 0.02); } else twist(t); },
+    tick(kind) { const t = ctx.currentTime + 0.005; if (kind === 'knap') knap(t); else if (kind === 'sap') { burst(t, 0.3, 'lowpass', 420, 1.2, 0.035); burst(t + 0.12, 0.2, 'bandpass', 700, 2, 0.015); } else if (kind === 'plant') { knock(t, 160, 70, 0.12, 0.05); burst(t, 0.1, 'lowpass', 600, 1, 0.03); } else if (kind === 'skin') { burst(t, 0.18, 'bandpass', 900, 1, 0.04); burst(t + 0.05, 0.12, 'highpass', 2500, 0.8, 0.02); } else twist(t); },
     thrust() { swish(ctx.currentTime + 0.13, 500, 1400, 0.22, 0.05); },
     whoosh() { swish(ctx.currentTime, 700, 260, 0.6, 0.06); },
     impact(kind) { thud(kind, ctx.currentTime + 0.005); },

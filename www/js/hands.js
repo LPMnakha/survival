@@ -4,7 +4,7 @@
 // peut ni bouger ni enchaîner un autre geste (pas de clics à répétition).
 import * as THREE from '../vendor/three.module.min.js';
 import { mergeColored } from './builder.js';
-import { itemGeometry, matFor } from './models.js';
+import { itemGeometry, matFor, isTorch } from './models.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const ease = (k) => k * k * (3 - 2 * k);
@@ -72,7 +72,7 @@ export function createHands({ camera, controls }) {
   // comment l'objet est tenu dans le poing
   function setItem(arm, type) {
     arm.type = type;
-    if (!type) { arm.item.visible = false; return; }
+    if (!type) { arm.item.visible = false; if (arm.flame) arm.flame.g.visible = false; return; }
     arm.item.geometry = itemGeometry(type);
     arm.item.material = matFor(type);
     arm.item.visible = true;
@@ -94,7 +94,14 @@ export function createHands({ camera, controls }) {
     else if (type === 'peau') { arm.item.position.set(0, -0.03, 0.05); arm.item.rotation.set(Math.PI / 2 - 0.3, 0, 0.3); }
     else if (type === 'tissu') { arm.item.position.set(0, -0.03, 0.05); arm.item.rotation.set(Math.PI / 2 - 0.3, 0, 0.2); }
     else if (type === 'grattoir') { arm.item.position.set(0.004, 0.012, 0.008); arm.item.rotation.set(0, Math.PI / 2, 0.3); }
+    else if (isTorch(type)) { arm.item.position.set(0, -TORCH.grip, 0.004); arm.item.rotation.set(TORCH.rx, 0, TORCH.rz * (arm === L ? -1 : 1)); }
+    // la flamme de la torche allumée suit le bout de la torche
+    if (type === 'torche-allumee' && flameMake && !arm.flame) { arm.flame = flameMake(); arm.flame.g.position.set(0, 0.56, 0); arm.item.add(arm.flame.g); }
+    if (arm.flame) arm.flame.g.visible = type === 'torche-allumee';
   }
+  const TORCH = { rx: 0.5, rz: 0.32, grip: 0.27, rest: new THREE.Vector3(0.035, -0.085, 0.02) };
+  let flameMake = null, flameK = 1, flameT = 0;
+  const qInv = new THREE.Quaternion();
 
   // place un bras : la main va au point voulu (repère caméra), l'avant-bras vient de l'épaule
   const zAxis = new THREE.Vector3(), xAxis = new THREE.Vector3(), yAxis = new THREE.Vector3(), upV = new THREE.Vector3(0, 1, 0), zUnit = new THREE.Vector3(0, 0, 1);
@@ -166,7 +173,7 @@ export function createHands({ camera, controls }) {
   const showArm = (type) => { setItem(R, type); R.g.visible = true; };
 
   // un pas, se baisser, ramasser l'objet au sol, le ranger
-  async function pickup(target, type, onGrab) {
+  async function pickup(target, type, onGrab, keep = false) {
     showArm(null);
     R.pose.roll = 0; R.pose.tilt = 0;
     // on s'accroupit moins pour un objet posé en hauteur (étagère, table)
@@ -179,9 +186,12 @@ export function createHands({ camera, controls }) {
     await tween(0.18, () => {});
     const c = R.pose.p.clone();
     const endP = end(ctx, 0.55);
-    await tween(0.5, (k) => R.pose.p.lerpVectors(c, POSE.pocket, ease(k)));
+    // ce qu'on garde en main (une torche allumée) remonte devant soi au lieu d'aller dans la poche
+    if (keep) await tween(0.5, (k) => { const e = ease(k); R.pose.p.lerpVectors(c, POSE.rest, e); R.pose.tilt = lerp(0, REST.tilt, e); R.pose.roll = lerp(0, REST.roll, e); });
+    else await tween(0.5, (k) => R.pose.p.lerpVectors(c, POSE.pocket, ease(k)));
     await endP;
     restore();
+    if (keep) { shown = 1; R.pose.tilt = REST.tilt; R.pose.roll = REST.roll; }
   }
 
   // sortir l'objet, s'approcher, se baisser, le poser à sa place
@@ -439,6 +449,48 @@ export function createHands({ camera, controls }) {
       });
       await Promise.all([moveTo(L, POSE.lAway, 0.4), tween(0.35, (k) => prop.scale.setScalar(Math.max(0.001, 1 - ease(k))))]);
       prop.visible = false;
+    } else if (kind === 'torche') {
+      // la gauche tient le bâton debout ; la droite enroule le tissu autour du bout, puis le serre avec la corde
+      const dir = V(0.3, 0.88, -0.36).normalize();
+      const hold = V(-0.05, -0.17, -0.37);
+      const at = (y) => hold.clone().addScaledVector(dir, y - 0.17);
+      prop.geometry = itemGeometry('torche', 2);
+      prop.material = matFor('torche');
+      prop.quaternion.setFromUnitVectors(V(0, 1, 0), dir);
+      prop.position.copy(at(0));
+      prop.visible = true;
+      prop.scale.setScalar(0.001);
+      setItem(L, null); setItem(R, 'tissu');
+      L.pose.p.copy(POSE.lAway); R.pose.p.copy(POSE.away);
+      const head = at(0.55);
+      await Promise.all([moveTo(L, hold, 0.5, ease, 0.9, 0.9), moveTo(R, head.clone().add(V(0.07, 0.0, 0.04)), 0.5, ease, 0.6, -0.8),
+        tween(0.35, (k) => prop.scale.setScalar(Math.max(0.001, ease(k))))]);
+      const wind = async (n, y0, y1, r) => {
+        for (let i = 0; i < n; i++) {
+          await tween(0.45, (k) => {
+            const a = k * Math.PI * 2, c = at(lerp(y0, y1, (i + k) / n));
+            R.pose.p.copy(c).add(V(Math.cos(a) * r + 0.03, Math.sin(a) * 0.012, Math.sin(a) * r * 0.8));
+            R.pose.roll = -0.8 + Math.sin(a) * 0.6;
+          });
+          onTick?.('wrap');
+        }
+      };
+      await wind(3, 0.6, 0.5, 0.055);
+      prop.geometry = itemGeometry('torche', 3);
+      setItem(R, 'corde');
+      await wind(3, 0.48, 0.45, 0.045);
+      prop.geometry = itemGeometry('torche', 0);
+      setItem(R, null);
+      onDone?.();
+      // on regarde la torche terminée
+      await moveTo(R, POSE.away, 0.4);
+      await tween(0.6, (k) => {
+        const lift = Math.sin(k * Math.PI) * 0.03;
+        prop.position.copy(at(0)).add(V(0, lift, 0));
+        L.pose.p.copy(hold).add(V(0, lift, 0));
+      });
+      await Promise.all([moveTo(L, POSE.lAway, 0.4), tween(0.35, (k) => prop.scale.setScalar(Math.max(0.001, 1 - ease(k))))]);
+      prop.visible = false;
     }
     // les mains redescendent
     await Promise.all([moveTo(L, POSE.lAway, 0.4), moveTo(R, POSE.away, 0.4)]);
@@ -495,6 +547,117 @@ export function createHands({ camera, controls }) {
     });
     L.g.visible = false;
     setItem(L, null);
+    await endP;
+    restore();
+  }
+
+  // ------------------------------------------------------------------ la torche
+  // porter le bout de la torche quelque part (la cavité pleine de sève, les flammes du feu) et l'y tenir
+  async function torchTo(target, type, { tilt = 1.9, roll = 0, dur = 2, back = 0.36, ticks = [], onMid, onEnd } = {}) {
+    setItem(R, type);
+    R.g.visible = true;
+    R.pose.roll = 0; R.pose.tilt = REST.tilt;
+    const above = target.y - controls.groundAt(target.x, target.z);
+    const ctx = await begin(target, { crouch: Math.max(0.05, Math.min(0.85, 0.95 - above * 0.75)), approach: 0.95 });
+    camera.updateMatrixWorld();
+    const dirW = target.clone().sub(camera.position).normalize();
+    const a = R.pose.p.clone(), t0 = R.pose.tilt;
+    // on cherche l'inclinaison du poignet qui pointe la torche vers le but, puis on place la main pour que le bout y arrive
+    const aim = aimTorch(R, SHOULDER.r, reachTo(target.clone().addScaledVector(dirW, -back), 0.72), toLocal(target).clone(), roll);
+    const b = aim.p;
+    tilt = aim.tilt;
+    R.pose.p.copy(a); R.pose.tilt = t0; R.pose.roll = 0;
+    await tween(0.55, (k) => { const e = ease(k); R.pose.p.lerpVectors(a, b, e); R.pose.tilt = lerp(t0, tilt, e); R.pose.roll = lerp(0, roll, e); });
+    let mid = false, tk = 0;
+    await tween(dur, (k) => {
+      // on tourne la torche pour bien l'enduire (ou la faire prendre)
+      R.pose.roll = roll + Math.sin(k * Math.PI * 4) * 0.3;
+      R.pose.p.copy(b);
+      R.pose.p.z += Math.sin(k * Math.PI * 4) * 0.008;
+      while (tk < ticks.length && k >= ticks[tk]) { onTick?.(ticks[tk++] >= 0 ? 'sap' : 'sap'); }
+      if (!mid && k >= 0.5) { mid = true; onMid?.(); }
+    });
+    onEnd?.();
+    const c = R.pose.p.clone(), t1 = R.pose.tilt, r1 = R.pose.roll;
+    const endP = end(ctx, 0.5);
+    await tween(0.5, (k) => { const e = ease(k); R.pose.p.lerpVectors(c, POSE.rest, e); R.pose.tilt = lerp(t1, REST.tilt, e); R.pose.roll = lerp(r1, REST.roll, e); });
+    await endP;
+    restore();
+    shown = 1; R.pose.tilt = REST.tilt; R.pose.roll = REST.roll;
+  }
+  const headL = new THREE.Vector3(), gripL = new THREE.Vector3();
+  function torchEnds(arm, shoulder, tipY = 0.56) {
+    placeArm(arm, shoulder);
+    root.updateMatrixWorld(true);
+    root.worldToLocal(arm.item.localToWorld(headL.set(0, tipY, 0)));
+    root.worldToLocal(arm.grip.getWorldPosition(gripL));
+  }
+  function aimTorch(arm, shoulder, guess, targetL, roll = 0, tipY = 0.56) {
+    let best = null;
+    const want = new THREE.Vector3();
+    for (let tl = 0.4; tl <= 2.9; tl += 0.1) {
+      arm.pose.p.copy(guess); arm.pose.tilt = tl; arm.pose.roll = roll;
+      torchEnds(arm, shoulder, tipY);
+      const d = headL.clone().sub(gripL).normalize().dot(want.copy(targetL).sub(gripL).normalize());
+      if (!best || d > best.d) best = { d, tl };
+    }
+    const p = guess.clone();
+    for (let i = 0; i < 4; i++) {
+      arm.pose.p.copy(p); arm.pose.tilt = best.tl;
+      torchEnds(arm, shoulder, tipY);
+      p.add(want.copy(targetL).sub(headL));
+    }
+    return { p, tilt: best.tl };
+  }
+  // allumer à la pierre à feu : la gauche tient la torche debout, la droite gratte la tige au-dessus du tissu enduit
+  async function lightTorch(attempts, onSpark) {
+    const p0 = await lookAtHands(-0.5);
+    both((a) => { a.g.visible = true; a.pose.roll = 0; a.pose.tilt = 0; });
+    setItem(L, 'torche-enduite'); setItem(R, 'pierre-a-feu');
+    L.item.rotation.set(0.2, 0, 0.55); // penchée vers le milieu, devant soi
+    L.pose.p.copy(POSE.lAway); R.pose.p.copy(POSE.away);
+    const hold = V(-0.12, -0.27, -0.42);
+    await moveTo(L, hold, 0.5, ease, 0.85, 0);
+    root.updateMatrixWorld(true);
+    const head = root.worldToLocal(L.item.localToWorld(V(0, 0.55, 0)));
+    // la tige de la pierre à feu pointe sur le tissu enduit : on la frotte vers lui
+    const aim = aimTorch(R, SHOULDER.r, head.clone().add(V(0.13, 0.08, 0.04)), head.clone().add(V(0.012, 0.01, 0.01)), -0.6, 0.185);
+    R.pose.p.copy(POSE.away); R.pose.tilt = 0; R.pose.roll = 0;
+    const s1 = aim.p, s0 = aim.p.clone().add(V(0.06, 0.07, 0.025));
+    await moveTo(R, s0, 0.5, ease, aim.tilt, -0.6);
+    const rodTip = () => { root.updateMatrixWorld(true); return R.item.localToWorld(V(0, 0.185, 0)); };
+    for (let i = 0; i < attempts; i++) {
+      await moveTo(R, s1, 0.14, easeOut);
+      onSpark?.(i, rodTip(), L.item.localToWorld(V(0, 0.55, 0)), i === attempts - 1);
+      await tween(0.14, () => {});
+      if (i < attempts - 1) await moveTo(R, s0, 0.42);
+    }
+    if (attempts) { setItem(L, 'torche-allumee'); L.item.rotation.set(0.2, 0, 0.55); }
+    // on regarde la flamme prendre, puis la torche passe dans la main droite
+    await Promise.all([moveTo(R, POSE.away, 0.45), tween(0.9, (k) => { L.pose.p.copy(hold).add(V(0.02 * Math.sin(k * Math.PI), 0.02 * Math.sin(k * Math.PI), 0)); })]);
+    await moveTo(L, POSE.lAway, 0.4);
+    L.g.visible = false;
+    setItem(L, null);
+    await lookUp(p0);
+    restore();
+  }
+  // planter la torche : on se baisse et on l'enfonce dans le sol, debout
+  async function plantTorch(target, onRelease) {
+    setItem(R, 'torche-allumee');
+    R.g.visible = true;
+    const ctx = await begin(target, { crouch: 0.8, approach: 0.7 });
+    const hi = reachTo(target.clone().add(V(0, 0.32, 0)), 0.8), lo = reachTo(target, 0.85);
+    const a = R.pose.p.clone(), t0 = R.pose.tilt, r0 = R.pose.roll;
+    await tween(0.5, (k) => { const e = ease(k); R.pose.p.lerpVectors(a, hi, e); R.pose.tilt = lerp(t0, 1.35, e); R.pose.roll = lerp(r0, 0, e); });
+    await tween(0.28, (k) => R.pose.p.lerpVectors(hi, lo, easeOut(k)));
+    onTick?.('plant');
+    await tween(0.12, (k) => { R.pose.roll = Math.sin(k * Math.PI * 2) * 0.12; });
+    onRelease?.();
+    setItem(R, null);
+    await tween(0.15, () => {});
+    const c = R.pose.p.clone();
+    const endP = end(ctx, 0.5);
+    await tween(0.45, (k) => R.pose.p.lerpVectors(c, POSE.pocket, ease(k)));
     await endP;
     restore();
   }
@@ -678,7 +841,10 @@ export function createHands({ camera, controls }) {
         poseSpear(ease(Math.min(1, Math.max(0, shown))), bob);
         R.g.visible = true;
       } else if (!busy) {
-        R.pose.p.lerpVectors(POSE.away, POSE.rest, ease(Math.min(1, Math.max(0, shown)))).add(bob);
+        const kS = ease(Math.min(1, Math.max(0, shown)));
+        R.pose.p.lerpVectors(POSE.away, POSE.rest, kS).add(bob);
+        // la torche, longue, est tenue plus bas pour que sa flamme reste dans le cadre
+        if (isTorch(heldType)) R.pose.p.addScaledVector(TORCH.rest, kS);
         // poignet plié vers l'avant : l'objet tenu reste droit malgré l'avant-bras qui monte
         R.pose.tilt = REST.tilt; R.pose.roll = REST.roll;
         R.g.visible = shown > 0.02 || !!heldType;
@@ -692,6 +858,15 @@ export function createHands({ camera, controls }) {
     placeArm(R, SHOULDER.r);
     placeArm(L, SHOULDER.l);
     updateFlakes(dt);
+    // flammes des torches : toujours droites, quelle que soit l'inclinaison de la main
+    flameT += dt;
+    for (const arm of [R, L]) {
+      if (!arm.flame || !arm.flame.g.visible || !arm.g.visible) continue;
+      root.updateMatrixWorld(true);
+      arm.item.getWorldQuaternion(qInv).invert();
+      arm.flame.g.quaternion.copy(qInv);
+      arm.flame.update(flameT, dt, flameK);
+    }
     // lumière : ciel, soleil, et la lueur d'un feu proche
     if (light) {
       amb.intensity = 0.18 + 0.32 * light.day;
@@ -714,5 +889,8 @@ export function createHands({ camera, controls }) {
     renderer.render(scene, camera);
   }
 
-  return { update, render, pickup, place, strike, fill, consume, cut, craft, thrust, throwSpear, skin, weave, setTick(fn) { onTick = fn; }, setHeld, get busy() { return busy; }, _arms: { R, L, root, scene, STRIKE, REST, BATON, CONSUME, SPEAR, LP, spearMesh, setItem } };
+  return { update, render, pickup, place, strike, fill, consume, cut, craft, thrust, throwSpear, skin, weave, torchTo, lightTorch, plantTorch,
+    setFlame(fn) { flameMake = fn; }, setFlameLevel(k) { flameK = k; },
+    torchHead() { if (R.type !== 'torche-allumee' || !R.g.visible) return null; root.updateMatrixWorld(true); return R.item.localToWorld(new THREE.Vector3(0, 0.6, 0)); },
+    setTick(fn) { onTick = fn; }, setHeld, get busy() { return busy; }, _arms: { R, L, root, scene, STRIKE, REST, BATON, CONSUME, SPEAR, LP, spearMesh, setItem } };
 }

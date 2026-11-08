@@ -879,6 +879,6 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
     update, groundAt, surfaceY, clamp, surfaceAt, colliders, streamDist: streamD, spawn: SPAWN,
     // pour les objets au sol et le feu de camp
     clearingAt, leafy, blocked, isFree: gClear, addLod, chunked, inWalk, addCollider, nearSite, sites: SITES, snowy,
-    snowShown: () => snowShown, _lods: lods, _hidden: hiddenGroups, tiles, ferns: fernList, swayMaterial: sway, streamX,
+    snowShown: () => snowShown, _lods: lods, _hidden: hiddenGroups, tiles, ferns: fernList, swayMaterial: sway, streamX, spruces: inner.spruce,
   };
 }

@@ -23,11 +23,15 @@ export const ITEMS = {
   viande: { one: 'viande crue', many: 'viandes crues', stack: 10 },
   'viande-cuite': { one: 'viande cuite', many: 'viandes cuites', stack: 10 },
   tissu: { one: 'tissu en fibres naturelles', many: 'tissus en fibres naturelles', stack: 10 },
+  torche: { one: 'torche', many: 'torches', stack: 10 },
+  'torche-enduite': { one: 'torche enduite de sève', many: 'torches enduites de sève', stack: 10 },
+  'torche-allumee': { one: 'torche allumée', many: 'torches allumées', stack: 1 },
 };
+export const isTorch = (type) => type === 'torche' || type === 'torche-enduite' || type === 'torche-allumee';
 // ce qui se gâte (temps réel)
 export const PERISH = { viande: 2 * 864e5, 'viande-cuite': 4 * 864e5 };
 // « un caillou », « une bâche »…
-const FEM = new Set(['brindille', 'pierre-a-feu', 'bache', 'bouteille', 'sacoche', 'baies', 'feuille', 'fibre', 'corde', 'lance', 'carte', 'peau', 'viande', 'viande-cuite']);
+const FEM = new Set(['brindille', 'pierre-a-feu', 'bache', 'bouteille', 'sacoche', 'baies', 'feuille', 'fibre', 'corde', 'lance', 'carte', 'peau', 'viande', 'viande-cuite', 'torche', 'torche-enduite', 'torche-allumee']);
 export const anItem = (type) => (FEM.has(type) ? 'une ' : 'un ') + ITEMS[type].one;
 export const theItem = (type) => (FEM.has(type) ? 'cette ' : type === 'baies' ? 'ces ' : 'ce ') + ITEMS[type].one;
 export const itemName = (type, n = 1) => (n > 1 ? ITEMS[type].many : ITEMS[type].one);
@@ -37,8 +41,8 @@ const cache = {};
 export function itemGeometry(type, variant = 0) {
   const key = type + variant;
   if (cache[key]) return cache[key];
-  if ((type === 'couteau' || type === 'lance') && variant === 1) {
-    const lying = itemGeometry(type, 0).clone().rotateZ(-Math.PI / 2).translate(type === 'lance' ? -0.85 : -0.07, 0.022, 0);
+  if ((type === 'couteau' || type === 'lance' || isTorch(type)) && variant === 1) {
+    const lying = itemGeometry(type, 0).clone().rotateZ(-Math.PI / 2).translate(type === 'lance' ? -0.85 : isTorch(type) ? -0.31 : -0.07, isTorch(type) ? 0.038 : 0.022, 0);
     cache[key] = lying;
     return lying;
   }
@@ -206,6 +210,30 @@ export function itemGeometry(type, variant = 0) {
     parts.push([new THREE.BoxGeometry(0.2, 0.006, 0.2).translate(0.006, 0.011, 0.004), 0xb3a679]); // le pli
     for (let k = 0; k < 5; k++) parts.push([new THREE.BoxGeometry(0.004, 0.003, 0.025).translate(-0.08 + k * 0.04, 0.003, 0.112), 0x9c9062]);
     g = mergeColored(parts);
+  } else if (isTorch(type)) {
+    // torche (axe +y, 62 cm) : bâton, tissu enroulé au bout, serré par la corde.
+    // variante 2 : le bâton seul, 3 : avec le tissu sans la corde (pendant la fabrication)
+    const head = type === 'torche' ? [0xb3a679, 0x9c9062] : type === 'torche-enduite' ? [0x9a6326, 0x7e4e1c] : [0x2a1d14, 0x1a120c];
+    const parts = [
+      [new THREE.CylinderGeometry(0.018, 0.023, 0.62, 6).translate(0, 0.31, 0), 0x5f4a38],
+      [new THREE.CylinderGeometry(0.022, 0.022, 0.006, 6).translate(0, 0.002, 0), 0xa9845c],
+    ];
+    if (variant !== 2) {
+      parts.push([new THREE.CylinderGeometry(0.037, 0.033, 0.13, 7).translate(0, 0.548, 0), head[0]]);
+      parts.push([new THREE.CylinderGeometry(0.036, 0.036, 0.03, 7).rotateZ(0.12).translate(0, 0.585, 0), head[1]]);
+      parts.push([new THREE.CylinderGeometry(0.035, 0.035, 0.025, 7).rotateZ(-0.1).translate(0, 0.515, 0), head[1]]);
+      parts.push([new THREE.CylinderGeometry(0.03, 0.022, 0.02, 7).translate(0, 0.623, 0), head[1]]);
+    }
+    if (variant !== 2 && variant !== 3) {
+      parts.push([new THREE.CylinderGeometry(0.026, 0.026, 0.035, 6).translate(0, 0.468, 0), 0xa48d62]);
+      parts.push([new THREE.TorusGeometry(0.025, 0.005, 4, 8).rotateX(Math.PI / 2).translate(0, 0.455, 0), 0x8a7550]);
+    }
+    // la sève coule en gouttes figées sous la tête
+    if (type === 'torche-enduite' && variant === 0) for (let k = 0; k < 4; k++) {
+      const a = k * 1.7;
+      parts.push([new THREE.ConeGeometry(0.008, 0.035 + (k % 2) * 0.02, 4).rotateX(Math.PI).translate(Math.cos(a) * 0.034, 0.47 - (k % 2) * 0.01, Math.sin(a) * 0.034), 0xc7882e]);
+    }
+    g = mergeColored(parts);
   } else if (type === 'grattoir') {
     const plate = new THREE.BoxGeometry(0.06, 0.03, 0.004);
     const edge = new THREE.BoxGeometry(0.06, 0.005, 0.0045).translate(0, 0.015, 0);
@@ -239,6 +267,9 @@ export const ICONS = {
   'viande-cuite': '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 11c4-5 13-6 17 0s1 13-6 13S3 16 7 11z" fill="#8a4f2a"/><path d="M11 10c3-2 8-2 11 1" fill="none" stroke="#c89a5e" stroke-width="2" stroke-linecap="round"/><path d="M10 15l3 2M15 13l3 2M13 19l3 2" stroke="#5e3218" stroke-width="1.3" stroke-linecap="round"/><path d="M20 22l5 5" stroke="#e9e2d0" stroke-width="3" stroke-linecap="round"/><circle cx="26.5" cy="28" r="2" fill="#e9e2d0"/></svg>',
   peau: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 16l3-6 8-2 9 1 5 5-2 7-8 4-9-1-5-4z" fill="#8a7a66"/><ellipse cx="16" cy="16" rx="6" ry="4" fill="#c9bca4"/><path d="M8 12l2 1M22 11l-1 2M9 21l2-1" stroke="#6e604e" stroke-width="1.2" stroke-linecap="round"/></svg>',
   tissu: '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="6" width="20" height="20" rx="1.5" fill="#b3a679"/><g stroke="#8f8458" stroke-width="1.6"><path d="M6 10h20M6 14h20M6 18h20M6 22h20"/></g><g stroke="#cfc39a" stroke-width="1.6" stroke-dasharray="2 2"><path d="M10 6v20M14 6v20M18 6v20M22 6v20"/></g><path d="M8 26v3M12 26v2.5M16 26v3M20 26v2.5M24 26v3" stroke="#9c9062" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  torche: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 28 19.5 12" stroke="#7a5e45" stroke-width="3.2" stroke-linecap="round"/><path d="M18 9.5l4.5-4.5 4.5 4.5-4.5 4.5z" fill="#b3a679"/><path d="M19.5 11l3 3M21 8.5l3 3" stroke="#9c9062" stroke-width="1.3"/><path d="M17.5 13.5l2 2" stroke="#a48d62" stroke-width="3"/></svg>',
+  'torche-enduite': '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 28 19.5 12" stroke="#7a5e45" stroke-width="3.2" stroke-linecap="round"/><path d="M18 9.5l4.5-4.5 4.5 4.5-4.5 4.5z" fill="#a8702c"/><path d="M19.5 11l3 3M21 8.5l3 3" stroke="#7e4e1c" stroke-width="1.3"/><path d="M17.5 13.5l2 2" stroke="#a48d62" stroke-width="3"/><path d="M20 15.5c0 1.6.6 2.4.6 3.2a.9.9 0 0 1-1.8 0c0-.8.6-1.6 1.2-3.2zM24.5 13c0 1.2.5 1.8.5 2.4a.8.8 0 0 1-1.6 0c0-.6.5-1.2 1.1-2.4z" fill="#d9952f"/></svg>',
+  'torche-allumee': '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 29 17 15" stroke="#7a5e45" stroke-width="3.2" stroke-linecap="round"/><path d="M15.5 13l3.5-3.5 3.5 3.5-3.5 3.5z" fill="#2a1d14"/><path d="M20 3c3 4 5 6 5 9.5a5 5 0 0 1-9 2.8c.4-2.5 2-3.6 2.4-6 .9 1.4 1.6 1.6 2.4 1-.8-2-.9-4.6-.8-7.3z" fill="#f29a4a"/><path d="M20.5 9c1.4 2 2.2 3 2.2 4.5a2.4 2.4 0 0 1-4.6.6c.4-1.6 1.4-2.2 2.4-5.1z" fill="#ffd98a"/></svg>',
   'pierre-a-feu': '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="13" y="16" width="6.5" height="12" rx="2.5" fill="#9a6a42"/><rect x="14.6" y="3.5" width="3.3" height="13" rx="1.2" fill="#55575e"/><g fill="#f0b46a"><circle cx="23" cy="6" r="1.1"/><circle cx="25.5" cy="10" r="0.8"/><circle cx="22" cy="11" r="0.7"/></g></svg>',
 };
 
