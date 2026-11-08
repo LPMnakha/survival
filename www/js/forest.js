@@ -433,7 +433,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
   function blocked(x, z, r, tallOnly = false) {
     for (let i = Math.floor((x - r - 2) / 8); i <= Math.floor((x + r + 2) / 8); i++) for (let j = Math.floor((z - r - 2) / 8); j <= Math.floor((z + r + 2) / 8); j++) {
       const L = CG.get(gk(i, j));
-      if (L) for (const c of L) if ((!tallOnly || !c.low) && x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) return true;
+      if (L) for (const c of L) if (!c.off && (!tallOnly || !c.low) && x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) return true;
     }
     return false;
   }
@@ -533,6 +533,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
   // ------------------------------------------------------------------ troncs couchés, gués (fusionnés)
   const B = new Builder();
   B.defineMaterial('plain', snowy(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }), 'bois'));
+  const logList = [];
   {
     let made = 0, guard = 0;
     const nLogs = 220;
@@ -547,6 +548,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
       const tilt = Math.atan2(h1 - h0, len);
       const y = (h0 + h1) / 2 + r * 0.55;
       B.push(x, y, z, a);
+      logList.push({ x, z, y: y + r * 0.85, len, a, r });
       const part = (g, color) => { g.rotateZ(tilt); B.add(g, color); };
       const bark = pick([0x5e4a3a, 0x67513e, 0x574536]);
       part(new THREE.CylinderGeometry(r * 0.9, r, len, 8).rotateZ(-Math.PI / 2), bark);
@@ -879,6 +881,6 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
     update, groundAt, surfaceY, clamp, surfaceAt, colliders, streamDist: streamD, spawn: SPAWN,
     // pour les objets au sol et le feu de camp
     clearingAt, leafy, blocked, isFree: gClear, addLod, chunked, inWalk, addCollider, nearSite, sites: SITES, snowy,
-    snowShown: () => snowShown, _lods: lods, _hidden: hiddenGroups, tiles, ferns: fernList, swayMaterial: sway, streamX, spruces: inner.spruce,
+    snowShown: () => snowShown, _lods: lods, _hidden: hiddenGroups, tiles, ferns: fernList, swayMaterial: sway, streamX, spruces: inner.spruce, birches: inner.birch, palette: P, rocks: rocks.flat(), fallenLogs: logList,
   };
 }

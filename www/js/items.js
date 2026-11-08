@@ -17,7 +17,7 @@ const KINDS = {
 };
 const RESPAWN = [10 * 60e3, 20 * 60e3];
 // demi-longueur de chaque objet posé à plat (selon x local) et s'il est fin (posé sur le sol, pas enfoncé)
-const FOOT = { torche: [0.31, true], 'torche-enduite': [0.31, true], tissu: [0.11, true], peau: [0.18, true], viande: [0.11, true], 'viande-cuite': [0.11, true], feuille: [0.18, true], fibre: [0.15, true], brindille: [0.17, true], baton: [0.36, true], lance: [0.85, true], couteau: [0.1, true], corde: [0.06, true], carte: [0.09, true], bache: [0.17, true], baies: [0.05, true], bouteille: [0.04, false], sacoche: [0.13, false], caillou: [0.06, false], silex: [0.06, false] };
+const FOOT = { hachette: [0.2, true], mousse: [0.06, false], torche: [0.31, true], 'torche-enduite': [0.31, true], tissu: [0.11, true], peau: [0.18, true], viande: [0.11, true], 'viande-cuite': [0.11, true], feuille: [0.18, true], fibre: [0.15, true], brindille: [0.17, true], baton: [0.36, true], lance: [0.85, true], couteau: [0.1, true], corde: [0.06, true], carte: [0.09, true], bache: [0.17, true], baies: [0.05, true], bouteille: [0.04, false], sacoche: [0.13, false], caillou: [0.06, false], silex: [0.06, false] };
 
 export function createGroundItems(scene, { forest, saved, onChange }) {
   // hauteur où poser un objet : au-dessus du sol dessiné sur toute sa longueur
@@ -102,9 +102,9 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   // objets jetés par le joueur : restent où ils sont tombés, sans repousse
   const DROP_MAX = 200;
   const droppedMesh = {}, dropped = {};
-  for (const type of ['brindille', 'caillou', 'baton', 'bache', 'bouteille', 'sacoche', 'baies', 'silex', 'feuille', 'fibre', 'corde', 'couteau', 'lance', 'carte', 'peau', 'viande', 'viande-cuite', 'tissu', 'torche', 'torche-enduite']) {
+  for (const type of ['brindille', 'caillou', 'baton', 'bache', 'bouteille', 'sacoche', 'baies', 'silex', 'feuille', 'fibre', 'corde', 'couteau', 'lance', 'carte', 'peau', 'viande', 'viande-cuite', 'tissu', 'torche', 'torche-enduite', 'hachette', 'mousse']) {
     dropped[type] = [];
-    const m = new THREE.InstancedMesh(itemGeometry(type, type === 'lance' || type === 'couteau' || type.startsWith('torche') ? 1 : 0), matFor(type), DROP_MAX);
+    const m = new THREE.InstancedMesh(itemGeometry(type, type === 'lance' || type === 'couteau' || type === 'hachette' || type.startsWith('torche') ? 1 : 0), matFor(type), DROP_MAX);
     m.count = 0;
     m.frustumCulled = false;
     m.castShadow = true;

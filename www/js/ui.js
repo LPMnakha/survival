@@ -6,17 +6,18 @@ import { RECIPE } from './campfire.js';
 import { RECIPE2 } from './collector.js';
 import { RECIPE3 } from './shelter.js';
 import { RECIPE5, WEAVES } from './loom.js';
+import { RECIPE6 } from './cabin.js';
 import { itemName, theItem, anItem, ICONS } from './models.js';
 import { YIELD } from './plants.js';
 import { NEEDS } from './needs.js';
 
 const SIP = 250;
 
-export function createUI({ canvas, camera, controls, inventory, items, campfires, collectors, shelters, looms, torches, berries, plants, rabbits, spears, needs, sleep, forest, hands, getAudio }) {
+export function createUI({ canvas, camera, controls, inventory, items, campfires, collectors, shelters, looms, torches, cabins, trees, logs, moss, berries, plants, rabbits, spears, needs, sleep, forest, hands, getAudio }) {
   const $ = (id) => document.getElementById(id);
   const pill = $('hint-pill'), actions = $('actions'), craft = $('craft-sheet'), recipes = $('recipes');
   const st = controls.state;
-  const builds = [campfires, collectors, shelters, looms];
+  const builds = [campfires, collectors, shelters, looms, cabins];
   const placingMod = () => builds.find((b) => b.placing);
 
   // ------------------------------------------------------------------ petit message en haut
@@ -52,22 +53,26 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
   const rainIcon = '<svg class="r-ico" viewBox="0 0 40 40" aria-hidden="true"><g stroke="#7a5e45" stroke-width="2.4" stroke-linecap="round"><path d="M8 34 10 16M32 34 30 16"/></g><path d="M7 16h26c-4 7-8 9-13 9S11 23 7 16z" fill="#3f7fb8"/><path d="M14 19.5c2 1.8 4 2.5 6 2.5s4-.7 6-2.5" fill="none" stroke="#7fb8de" stroke-width="2" stroke-linecap="round"/><g fill="#9cc9e8"><path d="M14 5c1.2 1.8 2 2.8 2 3.8a2 2 0 0 1-4 0c0-1 .8-2 2-3.8z"/><path d="M24 3c1.2 1.8 2 2.8 2 3.8a2 2 0 0 1-4 0c0-1 .8-2 2-3.8z"/></g></svg>';
   const loomIcon = '<svg class="r-ico" viewBox="0 0 40 40" aria-hidden="true"><g stroke="#7a5e45" stroke-width="2.4" stroke-linecap="round"><path d="M8 36 11 9M32 36 29 9M6 30h28M7 12h26"/></g><g stroke="#c3b78a" stroke-width="1.2"><path d="M13 12v18M17 12v18M21 12v18M25 12v18"/></g><path d="M12 23h16v7H12z" fill="#b3a679"/><g stroke="#8f8458" stroke-width="1"><path d="M12 25h16M12 27.5h16"/></g></svg>';
   const shelterIcon = '<svg class="r-ico" viewBox="0 0 40 40" aria-hidden="true"><path d="M5 31 20 12l15 19z" fill="#6f9a48"/><path d="M5 31 20 12l3 4-12 15z" fill="#5c853c"/><g stroke="#6b5240" stroke-width="2.4" stroke-linecap="round"><path d="M8 33 20 10M32 33 20 10M14 9l12 0"/></g><g fill="#9a968e"><ellipse cx="9" cy="33" rx="3" ry="2"/><ellipse cx="31" cy="33" rx="3" ry="2"/></g></svg>';
+  const cabinIcon = '<svg class="r-ico" viewBox="0 0 40 40" aria-hidden="true"><path d="M3 18 20 7l17 11z" fill="#6f9a48"/><path d="M3 18 20 7l2 1.5L6 19z" fill="#5c853c"/><g fill="#7a5e45"><rect x="6" y="18" width="28" height="3" rx="1.5"/><rect x="6" y="22" width="28" height="3" rx="1.5"/><rect x="6" y="26" width="28" height="3" rx="1.5"/><rect x="6" y="30" width="28" height="3" rx="1.5"/></g><rect x="23" y="21" width="6" height="12" fill="#4a3a2c"/><rect x="10" y="22" width="6" height="5" fill="#2e2620"/><g stroke="#a48d62" stroke-width="1"><path d="M12 22v5M14 22v5"/></g><g fill="#9a968e"><rect x="5" y="33" width="4" height="3"/><rect x="18" y="33" width="4" height="3"/><rect x="31" y="33" width="4" height="3"/></g></svg>';
   const ico = (t) => `<span class="r-ico">${ICONS[t]}</span>`;
   // outils : fabriqués dans les mains ; structures : posées au sol pièce par pièce
   const TOOLS = [
     { name: 'Couteau artisanal', needs: { silex: 2 }, out: 'couteau', icon: ico('couteau'), note: 'Pour couper les plantes : feuilles et fibres.' },
     { name: 'Corde', needs: { fibre: 2 }, out: 'corde', icon: ico('corde') },
     { name: 'Lance', needs: { baton: 1, corde: 1, couteau: 1 }, out: 'lance', icon: ico('lance'), note: 'La lame du couteau est ligaturée au bout du bâton.' },
+    { name: 'Hachette artisanale', needs: { silex: 2, corde: 1, baton: 1 }, out: 'hachette', icon: ico('hachette'), note: 'Deux éclats de silex ligaturés au bout d’un bâton. Elle abat les jeunes arbres.' },
     { name: 'Torche', needs: { baton: 1, corde: 1, tissu: 1 }, out: 'torche', icon: ico('torche'), note: 'Le tissu est enroulé au bout du bâton et serré avec la corde. Trempe-la dans la sève d’un épicéa avant de l’allumer.' },
   ];
   // une torche allumée occupe la main : il faut la planter pour faire autre chose
   const torchLit = () => inventory.heldType() === 'torche-allumee';
   const HANDS_FULL = 'Ta main tient la torche allumée : plante-la d’abord (« Planter la torche »).';
+  const CARRY = 'Tu portes une bûche sur l’épaule : pose-la d’abord (« Poser la bûche »).';
   const STRUCTS = [
     { recipe: RECIPE, mod: campfires, icon: fireIcon },
     { recipe: RECIPE2, mod: collectors, icon: rainIcon },
     { recipe: RECIPE3, mod: shelters, icon: shelterIcon },
     { recipe: RECIPE5, mod: looms, icon: loomIcon },
+    { recipe: RECIPE6, mod: cabins, icon: cabinIcon },
   ];
   // la fenêtre du métier à tisser : ce qu'on peut y fabriquer
   const loomSheet = $('loom-sheet'), loomList = $('loom-recipes');
@@ -91,8 +96,8 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
     craft.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === b));
     renderRecipes();
   }));
-  const needLine = (needs) => Object.entries(needs).map(([t, n]) => `${n} ${itemName(t, n)} <b>(${Math.min(inventory.count(t), n)}/${n})</b>`).join(' · ');
-  const hasAll = (needs) => Object.entries(needs).every(([t, n]) => inventory.count(t) >= n);
+  const needLine = (needs) => Object.entries(needs).map(([t, n]) => t === 'buche' ? `${n} bûches <b>(à apporter sur l’épaule)</b>` : `${n} ${itemName(t, n)} <b>(${Math.min(inventory.count(t), n)}/${n})</b>`).join(' · ');
+  const hasAll = (needs) => Object.entries(needs).every(([t, n]) => t === 'buche' || inventory.count(t) >= n);
   function renderRecipes() {
     recipes.innerHTML = '';
     const list = tab === 'outils' ? TOOLS.map((T) => ({ name: T.name, needs: T.needs, icon: T.icon, note: T.note, fn: () => craftTool(T) }))
@@ -109,6 +114,7 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
   function craftTool(T) {
     if (hands.busy) return;
     if (torchLit()) return hint(HANDS_FULL);
+    if (logs.carrying) return hint(CARRY);
     if (!hasAll(T.needs)) {
       const miss = Object.entries(T.needs).filter(([t, n]) => inventory.count(t) < n).map(([t, n]) => `${n - inventory.count(t)} ${itemName(t, n - inventory.count(t))}`);
       return hint(`Il te manque ${miss.join(' et ')}.`);
@@ -123,12 +129,13 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
     hands.craft(T.out, () => {
       inventory.add(T.out);
       getAudio()?.crafted(T.out);
-      hint(`${T.name} fabriqué${T.out === 'corde' || T.out === 'lance' || T.out === 'torche' ? 'e' : ''}.`, 2500);
+      hint(`${T.name} fabriqué${T.out === 'corde' || T.out === 'lance' || T.out === 'torche' || T.out === 'hachette' ? 'e' : ''}.`, 2500);
     });
   }
   $('btn-craft').addEventListener('click', () => {
     if (hands.busy) return;
     if (torchLit()) return hint(HANDS_FULL);
+    if (logs.carrying) return hint(CARRY);
     const on = !craft.classList.contains('on');
     inventory.open(false);
     inventory.openEquip(false);
@@ -261,15 +268,17 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
   let lastKnifeHint = 0;
   const P_HINT = () => { const t = performance.now(); if (t - lastKnifeHint < 20000) return false; lastKnifeHint = t; return true; };
   function tap(x, y) {
-    if (!st.enabled || hands.busy || placingMod() || sleep.busy || looms.weaving) return;
+    if (!st.enabled || hands.busy || placingMod() || sleep.busy || looms.weaving || trees.chopping) return;
     craft.classList.remove('on');
     const p = st.pos;
     const ht = inventory.heldType();
+    const carrying = logs.carrying;
     // feux de camp et récupérateurs
     for (const mod of builds) {
       const hit = mod.pickAt(camera, x, y, p);
       if (hit) {
         if (!hit.near) return hint('Approche-toi.');
+        if (carrying && mod !== cabins) return hint(CARRY);
         if (mod === campfires && ht && ht.startsWith('torche')) {
           const lit = hit.site.stage === 'lit';
           if (ht === 'torche-allumee') return hint(lit ? 'Le feu brûle déjà.' : 'La torche ne peut pas allumer le feu : il faut la pierre à feu.');
@@ -297,8 +306,27 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
     }
     // la torche allumée occupe la main : le reste attend qu'on la plante
     if (torchLit()) {
-      if (sap || spears.pickAt(camera, x, y, p) || rabbits.pickDead(camera, x, y, p) || items.pickAt(camera, x, y, p).spot || berries.pickAt(camera, x, y, p) || plants.pickAt(camera, x, y, p)) hint(HANDS_FULL);
+      if (sap || spears.pickAt(camera, x, y, p) || rabbits.pickDead(camera, x, y, p) || items.pickAt(camera, x, y, p).spot || berries.pickAt(camera, x, y, p) || plants.pickAt(camera, x, y, p) || logs.pickAt(camera, x, y, p) || trees.pickAt(camera, x, y, p)) hint(logs.pickAt(camera, x, y, p) ? 'Plante d’abord la torche : il faut tes deux mains pour porter une bûche.' : HANDS_FULL);
       return;
+    }
+    // une bûche sur l'épaule : les mains sont prises
+    if (carrying) {
+      if (tp || sap || spears.pickAt(camera, x, y, p) || rabbits.pickDead(camera, x, y, p) || items.pickAt(camera, x, y, p).spot || berries.pickAt(camera, x, y, p) || plants.pickAt(camera, x, y, p) || logs.pickAt(camera, x, y, p) || trees.pickAt(camera, x, y, p)) hint(CARRY);
+      return;
+    }
+    // hachette en main : abattre un jeune arbre, ébrancher, couper les bûches
+    const tr = trees.pickAt(camera, x, y, p);
+    if (tr && ht === 'hachette') {
+      if (!tr.near) return hint('Approche-toi de l’arbre.');
+      return trees.start(tr, p);
+    }
+    if (tr && tr.kind === 'fallen' && tr.near) return hint(`Prends la hachette en main pour ${tr.fallen.stage === 'branches' ? 'ébrancher l’arbre' : 'couper le tronc en bûches'}.`);
+    if (ht === 'hachette' && !tr && trees.pickBig(camera, x, y, p)) return hint('Cet arbre est bien trop gros pour une hachette en silex : cherche un jeune arbre au tronc fin.', 4000);
+    // une bûche au sol : sur l'épaule
+    const lg = logs.pickAt(camera, x, y, p);
+    if (lg) {
+      if (!lg.near) return hint('Approche-toi de la bûche.');
+      return logs.take(lg.log);
     }
     // une lance plantée : on la ramasse
     const sp = spears.pickAt(camera, x, y, p);
@@ -379,6 +407,13 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
       return;
     }
     if (plant && plant.near && P_HINT()) return hint(`Prends le couteau artisanal en main pour couper ${plants.name(plant.plant)}.`);
+    // la mousse des rochers et des troncs couchés, à la main
+    const ms = moss.pickAt(camera, x, y, p);
+    if (ms) {
+      if (!ms.near) return hint('Approche-toi pour ramasser la mousse.');
+      return moss.take(ms.spot);
+    }
+    if (tr && tr.near) return hint(inventory.count('hachette') ? 'Prends la hachette en main pour abattre ce jeune arbre.' : 'Il faut une hachette pour abattre ce jeune arbre.');
     if (sap && sap.near) return hint('De la sève coule de cette cavité : de quoi enduire une torche.');
     // l'eau du ruisseau n'est pas potable
     if (inventory.heldType() === 'bouteille') {
@@ -404,6 +439,12 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
     combat.classList.toggle('on', inventory.heldType() === 'lance' && st.enabled && !sleep.busy && !pm && !(hands.busy && !combat.classList.contains('on')));
     $('aim').classList.toggle('on', combat.classList.contains('on'));
     if (sleep.busy) { setActions('', []); pill.classList.remove('on'); return; }
+    // abattage : avancement et bouton pour s'arrêter
+    if (trees.chopping) {
+      setActions('couper', [{ label: 'Arrêter', fn: () => trees.stop() }]);
+      if (now >= hintUntil) { pill.textContent = trees.progress(); pill.classList.add('on'); }
+      return;
+    }
     // tissage : avancement et bouton pour s'arrêter
     if (looms.weaving) {
       setActions('tisser', [{ label: 'Arrêter', fn: () => looms.stop() }]);
@@ -424,13 +465,14 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
       if (!hands.busy && st.enabled) for (const m of builds) { const s = m.nearest(st.pos, 3.2); if (s && (!site || Math.hypot(s.x - st.pos.x, s.z - st.pos.z) < Math.hypot(site.x - st.pos.x, site.z - st.pos.z))) { site = s; mod = m; } }
       const held = inventory.heldSlot();
       // en haut de l'écran, pour ne pas le toucher en visant la construction
-      if (site && site.stage === 'build') setActions('demonter', [{ label: 'Démonter', fn: () => mod.dismantle(site) }], true);
+      if (!hands.busy && st.enabled && logs.carrying) setActions('poser', [{ label: 'Poser la bûche', main: true, fn: () => logs.drop(st.pos, st.yaw) }]);
+      else if (site && site.stage === 'build') setActions('demonter', [{ label: 'Démonter', fn: () => mod.dismantle(site) }], true);
       else if (!hands.busy && st.enabled && held && held.type === 'bouteille') setActions('boire' + (held.w > 0), [{ label: held.w > 0 ? 'Boire' : 'Bouteille vide', main: held.w > 0, fn: drink }]);
       else if (!hands.busy && st.enabled && held && (held.type === 'baies' || held.type === 'viande-cuite')) setActions('manger', [{ label: 'Manger', main: true, fn: eat }]);
       else if (!hands.busy && st.enabled && held && held.type === 'torche-allumee') setActions('planter', [{ label: 'Planter la torche', main: true, fn: () => torches.plant(st.pos, st.yaw) }]);
       else if (!hands.busy && st.enabled && held && held.type === 'torche-enduite') setActions('allumer', [{ label: 'Allumer', main: true, fn: () => torches.lightWithSteel() }]);
       else setActions('', []);
-      context = site && !hands.busy ? mod.label(site) : !hands.busy ? torches.label(st.pos) : '';
+      context = site && !hands.busy ? mod.label(site) : hands.busy ? '' : logs.carrying ? 'Bûche sur l’épaule' : held && held.type === 'hachette' ? trees.label(st.pos) : torches.label(st.pos);
     }
     // un message ponctuel passe avant l'indice de contexte
     if (now < hintUntil) return;

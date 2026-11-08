@@ -26,12 +26,16 @@ export const ITEMS = {
   torche: { one: 'torche', many: 'torches', stack: 10 },
   'torche-enduite': { one: 'torche enduite de sève', many: 'torches enduites de sève', stack: 10 },
   'torche-allumee': { one: 'torche allumée', many: 'torches allumées', stack: 1 },
+  hachette: { one: 'hachette artisanale', many: 'hachettes artisanales', stack: 1 },
+  mousse: { one: 'poignée de mousse', many: 'poignées de mousse', stack: 10 },
+  // la bûche ne va pas dans l'inventaire : elle se porte sur l'épaule (nom pour les recettes)
+  buche: { one: 'bûche', many: 'bûches', stack: 0 },
 };
 export const isTorch = (type) => type === 'torche' || type === 'torche-enduite' || type === 'torche-allumee';
 // ce qui se gâte (temps réel)
 export const PERISH = { viande: 2 * 864e5, 'viande-cuite': 4 * 864e5 };
 // « un caillou », « une bâche »…
-const FEM = new Set(['brindille', 'pierre-a-feu', 'bache', 'bouteille', 'sacoche', 'baies', 'feuille', 'fibre', 'corde', 'lance', 'carte', 'peau', 'viande', 'viande-cuite', 'torche', 'torche-enduite', 'torche-allumee']);
+const FEM = new Set(['brindille', 'pierre-a-feu', 'bache', 'bouteille', 'sacoche', 'baies', 'feuille', 'fibre', 'corde', 'lance', 'carte', 'peau', 'viande', 'viande-cuite', 'torche', 'torche-enduite', 'torche-allumee', 'hachette', 'mousse', 'buche']);
 export const anItem = (type) => (FEM.has(type) ? 'une ' : 'un ') + ITEMS[type].one;
 export const theItem = (type) => (FEM.has(type) ? 'cette ' : type === 'baies' ? 'ces ' : 'ce ') + ITEMS[type].one;
 export const itemName = (type, n = 1) => (n > 1 ? ITEMS[type].many : ITEMS[type].one);
@@ -41,8 +45,8 @@ const cache = {};
 export function itemGeometry(type, variant = 0) {
   const key = type + variant;
   if (cache[key]) return cache[key];
-  if ((type === 'couteau' || type === 'lance' || isTorch(type)) && variant === 1) {
-    const lying = itemGeometry(type, 0).clone().rotateZ(-Math.PI / 2).translate(type === 'lance' ? -0.85 : isTorch(type) ? -0.31 : -0.07, isTorch(type) ? 0.038 : 0.022, 0);
+  if ((type === 'couteau' || type === 'lance' || type === 'hachette' || isTorch(type)) && variant === 1) {
+    const lying = itemGeometry(type, 0).clone().rotateZ(-Math.PI / 2).translate(type === 'lance' ? -0.85 : isTorch(type) ? -0.31 : type === 'hachette' ? -0.2 : -0.07, isTorch(type) ? 0.038 : type === 'hachette' ? 0.03 : 0.022, 0);
     cache[key] = lying;
     return lying;
   }
@@ -143,6 +147,25 @@ export function itemGeometry(type, variant = 0) {
     const lash = new THREE.CylinderGeometry(0.021, 0.021, 0.07, 6).translate(0, 1.6, 0);
     const lash2 = new THREE.TorusGeometry(0.02, 0.004, 4, 8).rotateX(Math.PI / 2).translate(0, 1.57, 0);
     g = mergeColored([[shaft, 0x6a5240], [tip, 0x3a3c45], [lash, 0xa89268], [lash2, 0x8a7550]]);
+  } else if (type === 'hachette') {
+    // manche de 42 cm (axe +y), tête faite de deux éclats de silex ligaturés, tranchant vers +z
+    g = mergeColored([
+      [new THREE.CylinderGeometry(0.014, 0.018, 0.44, 6).translate(0, 0.22, 0), 0x7a5e45],
+      [new THREE.CylinderGeometry(0.019, 0.019, 0.006, 6).translate(0, 0.003, 0), 0xa9845c],
+      [new THREE.IcosahedronGeometry(0.05, 0).scale(0.42, 0.9, 1.5).translate(0, 0.375, 0.055), 0x474c55],
+      [new THREE.IcosahedronGeometry(0.04, 0).scale(0.4, 0.8, 1.2).translate(0.006, 0.39, 0.075), 0x5d636c],
+      [new THREE.IcosahedronGeometry(0.03, 0).scale(0.6, 0.7, 0.9).translate(0, 0.375, -0.03), 0x474c55],
+      [new THREE.CylinderGeometry(0.024, 0.024, 0.07, 6).translate(0, 0.375, 0), 0xa48d62],
+      [new THREE.TorusGeometry(0.023, 0.006, 4, 8).rotateX(Math.PI / 2).translate(0, 0.35, 0), 0x8a7550],
+      [new THREE.TorusGeometry(0.023, 0.006, 4, 8).rotateX(Math.PI / 2).translate(0, 0.4, 0), 0x8a7550],
+    ]);
+  } else if (type === 'mousse') {
+    g = mergeColored([
+      [new THREE.IcosahedronGeometry(0.05, 0).scale(1.3, 0.45, 1).translate(0, 0.02, 0), 0x5e8738],
+      [new THREE.IcosahedronGeometry(0.035, 0).scale(1.2, 0.5, 1).translate(0.04, 0.03, 0.02), 0x6f9a42],
+      [new THREE.IcosahedronGeometry(0.03, 0).scale(1, 0.5, 1.2).translate(-0.035, 0.025, -0.02), 0x52782f],
+      [new THREE.IcosahedronGeometry(0.02, 0).translate(0.01, 0.05, -0.01), 0x7aa64a],
+    ]);
   } else if (type === 'feuille') {
     // grande fronde de fougère posée à plat (axe long selon x)
     const parts = [[new THREE.BoxGeometry(0.36, 0.004, 0.008).translate(0, 0.006, 0), 0x5f8a3e]];
@@ -259,6 +282,8 @@ export const ICONS = {
   silex: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 19 10 10l9-3 7 6-2 9-11 3z" fill="#3a3c45"/><path d="M10 10l9-3 7 6-9 2z" fill="#5a5d6a"/><path d="M6 19l4-9 7 5-4 10z" fill="#2c2e35"/><path d="M19 7l4 1-2 3z" fill="#ddd6c6"/></svg>',
   couteau: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M23 4 26.5 7 14 20l-3-1z" fill="#4a4d58"/><path d="M23 4l3.5 3-6 6z" fill="#6b6f7c"/><path d="M11 19l3 1-4 6.5c-.8 1.2-2.6.6-2.5-.8z" fill="#b39d72"/><path d="M9.3 21.5l3 1.5M8.5 23.5l2.7 1.4" stroke="#8a7550" stroke-width="1.1"/></svg>',
   lance: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 28 22 10" stroke="#7a5e45" stroke-width="2.6" stroke-linecap="round"/><path d="M27.5 4.5 21 8l3 3z" fill="#4a4d58"/><path d="M20 10.5l2.5 2.5" stroke="#b39d72" stroke-width="3.2"/></svg>',
+  hachette: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 29 19 8" stroke="#7a5e45" stroke-width="3" stroke-linecap="round"/><path d="M17 5c3-1.5 7-1.2 10 1-1 4-3.5 7-7.5 8.5L16 12z" fill="#545a63"/><path d="M20 6.5c2.2-.6 4.4-.3 6 .8" stroke="#8a919b" stroke-width="1.2" fill="none"/><path d="M15.5 10.5l4 2" stroke="#a48d62" stroke-width="3.4"/></svg>',
+  mousse: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 24c1-6 6-9 11-8 2-4 8-5 11-1 3 1 3 6 2 9z" fill="#5e8738"/><path d="M8 22c1-3 4-4 7-3M17 18c2-2 5-2 7 0" stroke="#7aa64a" stroke-width="1.6" fill="none" stroke-linecap="round"/><g fill="#86b453"><circle cx="11" cy="20" r="1.2"/><circle cx="20" cy="17" r="1.1"/><circle cx="24" cy="21" r="1.1"/></g></svg>',
   feuille: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 27C8 15 15 8 27 5" fill="none" stroke="#5f8a3e" stroke-width="1.6" stroke-linecap="round"/><g fill="#79aa50"><path d="M9 21l-4.5-1 2.5 3.5zM9 21l1.5 4.5 1.5-4zM13 16l-4.5-1.5 2.8 3.7zM13 16l1.8 4.6 1.2-4.3zM17.5 12l-4.2-1.8 2.8 3.5zM17.5 12l2 4.2 1-4zM22 8.5l-3.6-1.8 2.4 3zM22 8.5l1.7 3.6.9-3.4z"/></g></svg>',
   fibre: '<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke-linecap="round" stroke-width="1.4"><path d="M4 20c8-3 16-5 24-9" stroke="#b9b07a"/><path d="M4 22c8-2 16-5 24-8" stroke="#a59c66"/><path d="M5 24c8-3 15-6 23-10" stroke="#c6be8a"/></g><path d="M14.5 15.5l2.5 6" stroke="#7f774c" stroke-width="2.4" stroke-linecap="round"/></svg>',
   corde: '<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke-width="2.6"><circle cx="16" cy="16" r="10" stroke="#b59e70"/><circle cx="16" cy="16" r="6.2" stroke="#a48d62"/><circle cx="16" cy="16" r="2.6" stroke="#b59e70"/></g><path d="M25 19c2 1 3 3 3.5 6" fill="none" stroke="#a48d62" stroke-width="2.4" stroke-linecap="round"/></svg>',

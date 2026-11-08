@@ -121,7 +121,7 @@ export function createSleep({ controls, needs, shelters, forest, hint, getAudio,
     timer -= dt;
     if (timer <= 0) { timer = 1; refresh(); }
     // la fatigue ralentit
-    st.speedMul = needs.sleepLevel < 0.25 ? 0.6 : 1;
+    st.speedMul = (needs.sleepLevel < 0.25 ? 0.6 : 1) * (st.carryMul || 1);
   }
   return { start, collapse, restore, onEnter, update, get busy() { return !!anim || !!needs.asleep; } };
 }

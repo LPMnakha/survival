@@ -76,6 +76,7 @@ export function createControls(camera, dom, colliders, { eye = 1.6, radius = 0.2
   function collide(p) {
     for (let pass = 0; pass < 3; pass++) {
       for (const c of colliders) {
+        if (c.off) continue;
         const x0 = c.x0 - radius, x1 = c.x1 + radius, z0 = c.z0 - radius, z1 = c.z1 + radius;
         if (p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1) {
           const dl = p.x - x0, dr = x1 - p.x, dt = p.z - z0, db = z1 - p.z;
