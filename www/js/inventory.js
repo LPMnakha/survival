@@ -94,9 +94,9 @@ export function createInventory({ saved, onChange }) {
 
   // ------------------------------------------------------------------ interface
   const $ = (id) => document.getElementById(id);
-  const quick = $('quick'), full = $('inv-slots'), sheet = $('inv-sheet'), dropBtn = $('btn-drop'), equipBtn = $('btn-equip');
+  const quick = $('quick'), full = $('inv-slots'), sheet = $('inv-sheet'), dropBtn = $('btn-drop'), equipBtn = $('btn-equip'), readBtn = $('btn-read');
   const eqSheet = $('equip-sheet'), eqSlots = $('equip-slots'), eqBtn = $('btn-unequip'), eqHint = $('equip-hint');
-  let onDrop = null, onEquip = null, locked = () => false;
+  let onDrop = null, onEquip = null, onRead = null, locked = () => false;
   const slotHTML = (s) => {
     if (!s) return '';
     if (s.type === 'bouteille') return `${bottleIcon(s.w)}<span class="qty">${fmtWater(s.w)}</span>`;
@@ -107,7 +107,8 @@ export function createInventory({ saved, onChange }) {
   for (let i = 0; i < QUICK; i++) {
     const b = document.createElement('button');
     b.className = 'slot';
-    b.addEventListener('click', () => { if (!locked()) toggleHeld(i); });
+    // la carte s'ouvre directement ; le reste se prend en main
+    b.addEventListener('click', () => { if (locked()) return; if (slots[i]?.type === 'carte') onRead?.(); else toggleHeld(i); });
     quick.appendChild(b);
   }
   for (let i = 0; i < MAX; i++) {
@@ -157,6 +158,7 @@ export function createInventory({ saved, onChange }) {
     const wear = s && ITEMS[s.type].wear;
     equipBtn.hidden = !wear;
     equipBtn.disabled = !wear || !!equip[wear] || locked();
+    readBtn.hidden = !(s && s.type === 'carte');
     // équipement
     eqSlots.querySelectorAll('.slot').forEach((b) => {
       const e = equip[b.dataset.id];
@@ -185,6 +187,7 @@ export function createInventory({ saved, onChange }) {
     render();
   }
   dropBtn.addEventListener('click', () => { if (!dropBtn.disabled && onDrop) onDrop(sel); });
+  readBtn.addEventListener('click', () => { open(false); onRead?.(); });
   equipBtn.addEventListener('click', () => {
     if (equipBtn.disabled) return;
     const t = slots[sel]?.type;
@@ -208,6 +211,7 @@ export function createInventory({ saved, onChange }) {
     count, canAdd, add, take, takeAt, heldType, heldSlot, toggleHeld, swap, open, openEquip, render, equipFrom, unequip,
     setDrop(fn) { onDrop = fn; },
     setEquipMessage(fn) { onEquip = fn; },
+    setRead(fn) { onRead = fn; },
     get held() { return held; },
     get slots() { return slots; },
     get equip() { return equip; },

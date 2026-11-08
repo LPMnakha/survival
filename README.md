@@ -10,10 +10,15 @@ Une forêt 3D à la première personne où il faut survivre : boire, manger, fai
 
 ## Survivre
 
+- **Sommeil** (jauge lune) : il baisse en temps réel quand on est éveillé (2 jours pour le vider). On ne dort que dans l'**abri de fortune** : touche-le pour t'y allonger, puis tu peux fermer l'appli, tu dors jusqu'à ton retour (8 h remplissent la jauge). Sous 25 %, on avance moins vite ; à 0, on s'endort sur place (deux fois moins réparateur, on peut se lever à partir de 30 %).
 - **Soif et faim** (jauges en haut à gauche), en temps réel, **même appli fermée** : 3 jours sans boire ou 14 jours sans manger, et c'est la fin. **Pas de deuxième chance** : la partie s'arrête, il faut en recommencer une.
 - **Boire** : il faut 1 L par jour. La bouteille (1 L) se remplit au récupérateur d'eau de pluie ; « Boire » prend 25 cl (environ 8 % de la jauge). L'eau du ruisseau n'est pas potable.
 - **Manger** : les baies des buissons (5 poignées par buisson, elles repoussent en une semaine, peu de buissons garnis en hiver). « Manger » une poignée remonte la faim de 3 %.
-- **Lieux abandonnés** à fouiller (le butin ne se trouve qu'une fois par partie) : une vieille cabane en rondins (bâche, bouteille), un campement abandonné (sacoche) et un mirador de chasse.
+- **Lieux abandonnés** à fouiller (le butin ne se trouve qu'une fois par partie) : une vieille cabane en rondins (bâche, bouteille), un campement abandonné (sacoche) et un mirador de chasse (la carte, dans une boîte clouée à un poteau).
+- **Carte** : touche-la dans l'inventaire pour l'ouvrir. On y écrit au doigt au crayon, la gomme efface ; les notes sont gardées.
+- **Silex** : rares, surtout dans le lit du ruisseau.
+- **Plantes** : couteau artisanal en main, touche une fougère (2 feuilles), des orties ou des joncs (1 fibre). Elles repoussent en 3 jours.
+- **Fabriquer** a deux onglets. **Outils** (faits dans les mains) : couteau artisanal (2 silex), corde (2 fibres), lance (1 bâton, 1 corde, 1 couteau artisanal, dont la lame est ligaturée au bout). **Structures** (posées au sol pièce par pièce) : petit feu de camp, récupérateur d'eau de pluie, abri de fortune (6 bâtons, 4 cordes, 20 feuilles, 4 cailloux).
 - **Équipement** (icône t-shirt) : tête, haut, bas, chaussures, sac. La sacoche se met dans la case sac et ajoute 3 cases à l'inventaire.
 - **Récupérateur d'eau de pluie** (Fabriquer) : 1 bâche, 4 bâtons, 4 cailloux. Il recueille la pluie réelle d'Annecy (1 mm = 1 L), même appli fermée, jusqu'à 10 L.
 
@@ -25,7 +30,7 @@ Une forêt 3D à la première personne où il faut survivre : boire, manger, fai
 - **Fabriquer** (icône outils) : *Petit feu de camp* = 8 cailloux, 10 brindilles, 4 bâtons. Place la preview au sol, puis touche-la pour poser les éléments un par un (cailloux en cercle, brindilles au centre, bâtons en tipi). « Démonter » rend ce qui a été posé.
 - **Allumer** : prends la pierre à feu en main et touche le feu. Le feu prend en 1 à 3 coups.
 - **Entretenir** : le feu brûle 10 min, chaque bâton ajoute 5 min (20 min de réserve au plus). Il faiblit avant de s'éteindre. Éteint, remets 3 brindilles puis rallume-le.
-- **Sauvegarde** sur l'appareil : inventaire, équipement, objets ramassés et posés, feux, récupérateurs, jauges. Le feu brûle et la pluie tombe appli fermée.
+- **Sauvegarde** sur l'appareil : position, inventaire, équipement, objets ramassés et posés, feux, récupérateurs, abris, plantes coupées, notes sur la carte, jauges. Le feu brûle et la pluie tombe appli fermée.
 
 ## Jouer
 

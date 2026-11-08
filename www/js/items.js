@@ -12,13 +12,15 @@ const KINDS = {
   brindille: { active: 12800, pool: 18000, start: 28, want: (d, cl) => 1 - cl * 0.6 },
   caillou: { active: 4000, pool: 6800, start: 10, want: (d, cl) => 0.3 + 0.7 * smooth(9, 2, d) },
   baton: { active: 3200, pool: 5200, start: 7, want: (d, cl) => 1 - cl * 0.85 },
+  // silex : rares, surtout dans le lit du ruisseau (un seul près du départ)
+  silex: { active: 420, pool: 700, start: 1, want: (d, cl) => 0.08 + 0.92 * smooth(6, 1.8, d) },
 };
 const RESPAWN = [10 * 60e3, 20 * 60e3];
 
 export function createGroundItems(scene, { forest, saved, onChange }) {
   const R = makeNoise(41).rnd;
   const spots = []; // { id, type, x, y, z, rot, variant, def, on, mesh, idx }
-  const byType = { brindille: [], caillou: [], baton: [] };
+  const byType = { brindille: [], caillou: [], baton: [], silex: [] };
   const sp = forest.spawn;
   const ok = (x, z) => forest.inWalk(x, z, -2) && forest.streamDist(x, z) > 1.7 && !forest.nearSite(x, z, 1) && !forest.blocked(x, z, 0.3);
   for (const [type, K] of Object.entries(KINDS)) {
@@ -37,7 +39,7 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
       list.push({ x, z });
     }
     list.forEach((s, i) => {
-      Object.assign(s, { id: spots.length, type, y: forest.groundAt(s.x, s.z) + 0.05, rot: R() * Math.PI * 2, variant: type === 'caillou' ? Math.floor(R() * 3) : 0, s: 1, def: i < K.active, on: i < K.active });
+      Object.assign(s, { id: spots.length, type, y: forest.groundAt(s.x, s.z) + 0.05, rot: R() * Math.PI * 2, variant: type === 'caillou' || type === 'silex' ? Math.floor(R() * 3) : 0, s: 1, def: i < K.active, on: i < K.active });
       spots.push(s);
     });
   }
@@ -53,7 +55,7 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   const m4 = new THREE.Matrix4(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
   const groups = {};
   for (const s of spots) (groups[s.type + s.variant] ||= []).push(s);
-  for (const list of Object.values(groups)) forest.chunked(itemGeometry(list[0].type, list[0].variant), itemMaterial, list, { size: 27, far: 42 });
+  for (const list of Object.values(groups)) forest.chunked(itemGeometry(list[0].type, list[0].variant), matFor(list[0].type), list, { size: 27, far: 42 });
   const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v3 = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
   const show = (s) => {
     s.mesh.setMatrixAt(s.idx, s.on ? m4.compose(v3.set(s.x, s.y, s.z), q.setFromAxisAngle(up, s.rot), one) : zero);
@@ -89,9 +91,9 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   // objets jetés par le joueur : restent où ils sont tombés, sans repousse
   const DROP_MAX = 200;
   const droppedMesh = {}, dropped = {};
-  for (const type of ['brindille', 'caillou', 'baton', 'bache', 'bouteille', 'sacoche', 'baies']) {
+  for (const type of ['brindille', 'caillou', 'baton', 'bache', 'bouteille', 'sacoche', 'baies', 'silex', 'feuille', 'fibre', 'corde', 'couteau', 'lance']) {
     dropped[type] = [];
-    const m = new THREE.InstancedMesh(itemGeometry(type, 0), matFor(type), DROP_MAX);
+    const m = new THREE.InstancedMesh(itemGeometry(type, type === 'lance' || type === 'couteau' ? 1 : 0), matFor(type), DROP_MAX);
     m.count = 0;
     m.frustumCulled = false;
     m.castShadow = true;

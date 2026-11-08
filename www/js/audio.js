@@ -185,6 +185,22 @@ export function createForestAudio() {
       burst(at, 0.08, 'lowpass', 380, 0.8, 0.04);
     }
   }
+  // taille du silex : un « tac » sec et clair, un peu différent à chaque coup
+  function knap(t) {
+    knock(t, 2400 + Math.random() * 600, 1500, 0.035, 0.07);
+    burst(t, 0.04, 'bandpass', 3800 + Math.random() * 1500, 3, 0.06);
+    burst(t + 0.01, 0.06, 'highpass', 5000, 0.8, 0.02);
+  }
+  // fibres qu'on tord, corde qu'on serre
+  function twist(t) { for (let i = 0; i < 4; i++) burst(t + i * 0.06, 0.07, 'bandpass', 1600 + Math.random() * 900, 1.2, 0.025); }
+  // un coup de couteau dans les tiges
+  function slice(t) {
+    for (let k = 0; k < 3; k++) {
+      const at = t + 1.12 + k * 0.37;
+      burst(at, 0.09, 'highpass', 3000, 0.8, 0.04);
+      burst(at + 0.02, 0.05, 'bandpass', 1800, 2, 0.03);
+    }
+  }
   // croquer des baies
   function crunch(t) { for (let i = 0; i < 3; i++) { burst(t + i * 0.12, 0.05, 'bandpass', 1500 + Math.random() * 800, 1.5, 0.04); knock(t + i * 0.12, 300, 180, 0.05, 0.025); } }
   function scrape(t) {
@@ -240,7 +256,7 @@ export function createForestAudio() {
     }
   }
 
-  let on = true;
+  let on = true, sleepK = 1;
   return {
     ctx, step,
     pick(type) { handle(type, ctx.currentTime + 0.01); },
@@ -249,11 +265,17 @@ export function createForestAudio() {
     pour() { pourSound(ctx.currentTime); },
     drink() { gulps(ctx.currentTime + 0.05); },
     eat() { crunch(ctx.currentTime + 0.02); },
+    tick(kind) { const t = ctx.currentTime + 0.005; if (kind === 'knap') knap(t); else twist(t); },
+    cut() { /* le bruit des coups est joué pendant le geste */ },
+    cutStart() { slice(ctx.currentTime); },
+    crafted(type) { handle(type === 'couteau' ? 'caillou' : 'brindille', ctx.currentTime + 0.01); },
+    // en dormant, la forêt s'éloigne doucement
+    setSleep(asleep) { sleepK = asleep ? 0.35 : 1; master.gain.setTargetAtTime(on ? sleepK : 0, ctx.currentTime, 2); },
     ignite() { whoosh(ctx.currentTime + 0.05); },
     setFire(level) { fireLevel = level; fireBus.gain.setTargetAtTime(Math.min(1, level * 1.3), ctx.currentTime, 0.25); },
     async start() {
       if (ctx.state !== 'running') await ctx.resume();
-      master.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 1.2);
+      master.gain.setTargetAtTime(on ? sleepK : 0, ctx.currentTime, 1.2);
     },
     // ambiance : météo, jour, distance au ruisseau
     setAmbience({ rain = 0, wind = 0, snow = 0, day = 1, brook = 0, birds = 1 }) {
@@ -267,7 +289,7 @@ export function createForestAudio() {
     },
     toggle() {
       on = !on;
-      master.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 0.3);
+      master.gain.setTargetAtTime(on ? sleepK : 0, ctx.currentTime, 0.3);
       return on;
     },
     get on() { return on; },

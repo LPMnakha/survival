@@ -50,6 +50,7 @@
     <div class="sheet-btns">
       <button id="btn-drop" class="drop-btn" disabled>Jeter</button>
       <button id="btn-equip" class="drop-btn" hidden>Équiper</button>
+      <button id="btn-read" class="drop-btn" hidden>Ouvrir la carte</button>
     </div>
     <p class="sheet-hint">Les 3 premières cases sont l’accès rapide. Touche une case puis une autre pour les échanger, ou « Jeter » pour poser un objet au sol.</p>
     <button class="sheet-close">Fermer</button>
@@ -65,7 +66,27 @@
 
   <div id="needs" hidden aria-label="Soif et faim">
     <div class="need" id="need-soif"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="track" cx="18" cy="18" r="15"/><circle class="bar" cx="18" cy="18" r="15"/><path class="ico" d="M18 9.5c3 4 5 6.6 5 9.4a5 5 0 0 1-10 0c0-2.8 2-5.4 5-9.4z"/></svg></div>
+    <div class="need" id="need-sommeil"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="track" cx="18" cy="18" r="15"/><circle class="bar" cx="18" cy="18" r="15"/><path class="ico" d="M20.5 10.5a7.5 7.5 0 1 0 5 12 6 6 0 0 1-5-12z"/></svg></div>
     <div class="need" id="need-faim"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="track" cx="18" cy="18" r="15"/><circle class="bar" cx="18" cy="18" r="15"/><g class="ico"><path d="M18 26V12"/><path d="M18 14c-2.6-.3-3.8-1.8-4-4 2.5.2 3.7 1.6 4 4zm0 0c2.6-.3 3.8-1.8 4-4-2.5.2-3.7 1.6-4 4zM18 18c-2.6-.3-3.8-1.8-4-4 2.5.2 3.7 1.6 4 4zm0 0c2.6-.3 3.8-1.8 4-4-2.5.2-3.7 1.6-4 4zM18 22c-2.6-.3-3.8-1.8-4-4 2.5.2 3.7 1.6 4 4zm0 0c2.6-.3 3.8-1.8 4-4-2.5.2-3.7 1.6-4 4z"/></g></svg></div>
+  </div>
+
+  <div id="map" hidden role="dialog" aria-label="Carte">
+    <canvas id="map-canvas"></canvas>
+    <div class="map-tools">
+      <button id="map-pen" class="on" aria-label="Crayon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 20l1-4L16 5l3 3L8 19z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 7l3 3" stroke="currentColor" stroke-width="1.6"/></svg>Crayon</button>
+      <button id="map-eraser" aria-label="Gomme"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8.5 19.5 3.5 14.5l9-9 7 7-7 7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 10l6 6M8.5 19.5H20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Gomme</button>
+      <button id="map-close">Fermer</button>
+    </div>
+  </div>
+
+  <div id="sleep" hidden>
+    <div class="card">
+      <p class="sleep-moon" aria-hidden="true"><svg viewBox="0 0 36 36" width="40" height="40"><path d="M20.5 8.5a9.5 9.5 0 1 0 7 15.5 7.5 7.5 0 0 1-7-15.5z" fill="#d9d2f0"/></svg></p>
+      <h2 id="sleep-title">Tu dors dans l’abri.</h2>
+      <p id="sleep-level"></p>
+      <p id="sleep-note"></p>
+      <button id="btn-wake">Se lever</button>
+    </div>
   </div>
 
   <div id="gameover" hidden>
@@ -79,6 +100,10 @@
 
   <div id="craft-sheet" class="sheet" role="dialog" aria-label="Fabriquer">
     <p class="sheet-title">Fabriquer</p>
+    <div class="tabs" role="tablist">
+      <button class="tab on" data-tab="outils" role="tab">Outils</button>
+      <button class="tab" data-tab="structures" role="tab">Structures</button>
+    </div>
     <div id="recipes"></div>
     <button class="sheet-close">Fermer</button>
   </div>

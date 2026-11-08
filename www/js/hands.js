@@ -85,6 +85,11 @@ export function createHands({ camera, controls }) {
     else if (type === 'bouteille') { arm.item.position.set(0, -0.09, 0.005); arm.item.rotation.set(0, 0, 0); }
     else if (type === 'baies') { arm.item.position.set(0, 0.035, 0.01); arm.item.rotation.set(-0.3, 0, 0); }
     else if (type === 'bache' || type === 'sacoche') { arm.item.position.set(0, -0.02, 0.06); arm.item.rotation.set(Math.PI / 2 - 0.2, 0, 0); }
+    else if (type === 'silex') { arm.item.position.set(0, -0.01, 0.012); }
+    else if (type === 'feuille' || type === 'fibre') { arm.item.rotation.set(0, 0, Math.PI / 2 - 0.3); arm.item.position.set(0, 0.04, 0); }
+    else if (type === 'corde') { arm.item.position.set(0, -0.02, 0.03); arm.item.rotation.set(Math.PI / 2, 0, 0); }
+    else if (type === 'couteau') { arm.item.position.set(0, 0.0, 0.004); arm.item.rotation.set(-0.15, Math.PI / 2, 0); }
+    else if (type === 'lance') { arm.item.position.set(0, -0.62, 0); arm.item.rotation.set(-0.25, 0, -0.12); }
     else if (type === 'grattoir') { arm.item.position.set(0.004, 0.012, 0.008); arm.item.rotation.set(0, Math.PI / 2, 0.3); }
   }
 
@@ -244,6 +249,201 @@ export function createHands({ camera, controls }) {
     restore();
   }
 
+  // ------------------------------------------------------------------ éclats de silex et cordon (dans le repère des mains)
+  const FLK = 40, flkPos = new Float32Array(FLK * 3), flkVel = new Float32Array(FLK * 3), flkLife = new Float32Array(FLK);
+  const flkGeo = new THREE.BufferGeometry();
+  flkGeo.setAttribute('position', new THREE.BufferAttribute(flkPos, 3));
+  const flakes = new THREE.Points(flkGeo, new THREE.PointsMaterial({ color: 0x6e7078, size: 0.011, sizeAttenuation: true }));
+  flakes.frustumCulled = false;
+  root.add(flakes);
+  let flkNext = 0;
+  function chips(at, n = 6) {
+    for (let k = 0; k < n; k++) {
+      const i = flkNext++ % FLK;
+      flkPos.set([at.x, at.y, at.z], i * 3);
+      flkVel.set([(Math.random() - 0.3) * 0.5, 0.15 + Math.random() * 0.35, (Math.random() - 0.5) * 0.3], i * 3);
+      flkLife[i] = 0.6 + Math.random() * 0.4;
+    }
+  }
+  function updateFlakes(dt) {
+    for (let i = 0; i < FLK; i++) {
+      if (flkLife[i] <= 0) { flkPos[i * 3 + 1] = -99; continue; }
+      flkLife[i] -= dt;
+      flkVel[i * 3 + 1] -= 2.2 * dt;
+      for (let k = 0; k < 3; k++) flkPos[i * 3 + k] += flkVel[i * 3 + k] * dt;
+    }
+    flkGeo.attributes.position.needsUpdate = true;
+  }
+  // un objet posé dans le champ de vision pendant une fabrication (la lance)
+  const prop = new THREE.Mesh(itemGeometry('lance'), matFor('lance'));
+  prop.visible = false;
+  root.add(prop);
+  // cordon entre les deux mains (pour tresser la corde)
+  const strandMat = new THREE.MeshStandardMaterial({ color: 0xb3a272, roughness: 1, flatShading: true });
+  const strand = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 1, 5, 6).translate(0, 0.5, 0), strandMat);
+  strand.visible = false;
+  root.add(strand);
+  const gL = new THREE.Vector3(), gR = new THREE.Vector3(), upY = new THREE.Vector3(0, 1, 0);
+  function updateStrand(twist) {
+    if (!strand.visible) return;
+    root.updateMatrixWorld(true);
+    root.worldToLocal(L.grip.getWorldPosition(gL));
+    root.worldToLocal(R.grip.getWorldPosition(gR));
+    const d = gR.clone().sub(gL), len = d.length();
+    strand.position.copy(gL);
+    strand.quaternion.setFromUnitVectors(upY, d.normalize());
+    strand.rotateY(twist);
+    strand.scale.set(1, len, 1);
+  }
+
+  // regarder ses mains : on baisse les yeux, on ne bouge plus
+  async function lookAtHands(pitch = -0.72) {
+    busy = true;
+    st.frozen = true;
+    const p0 = st.pitch;
+    await tween(0.45, (k) => { st.pitch = lerp(p0, pitch, ease(k)); });
+    return p0;
+  }
+  async function lookUp(p0) {
+    const p1 = st.pitch;
+    await tween(0.45, (k) => { st.pitch = lerp(p1, Math.min(p0, -0.2), ease(k)); });
+    st.frozen = false;
+    busy = false;
+  }
+  const both = (fn) => { fn(R); fn(L); };
+  const moveTo = (arm, to, dur, e = ease, tilt, roll) => {
+    const a = arm.pose.p.clone(), t0 = arm.pose.tilt, r0 = arm.pose.roll;
+    return tween(dur, (k) => { const x = e(k); arm.pose.p.lerpVectors(a, to, x); if (tilt !== undefined) arm.pose.tilt = lerp(t0, tilt, x); if (roll !== undefined) arm.pose.roll = lerp(r0, roll, x); });
+  };
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+  // couper une plante : la gauche saisit le haut, la droite tranche la base, la gauche se relève avec la récolte
+  async function cut(target, harvest, onCut) {
+    setItem(R, 'couteau');
+    R.g.visible = true;
+    R.pose.roll = 0; R.pose.tilt = 0;
+    const ctx = await begin(target, { crouch: 0.72, approach: 0.85 });
+    setItem(L, null);
+    L.g.visible = true;
+    L.pose.p.copy(POSE.lAway); L.pose.roll = 1.1; L.pose.tilt = 0.2;
+    const top = reachTo(new THREE.Vector3(target.x, target.y + 0.28, target.z), 0.75);
+    const base = reachTo(new THREE.Vector3(target.x, target.y + 0.05, target.z), 0.8);
+    await Promise.all([moveTo(L, top, 0.45), moveTo(R, base.clone().add(V(0.09, 0.02, 0.02)), 0.45, ease, 0.6, -1.3)]);
+    for (let i = 0; i < 3; i++) {
+      // un coup vif de droite à gauche, la plante tremble
+      await moveTo(R, base.clone().add(V(-0.07, 0, 0)), 0.15, easeOut);
+      L.pose.p.y -= 0.006;
+      await moveTo(R, base.clone().add(V(0.09, 0.02, 0.02)), 0.22);
+    }
+    onCut?.();
+    setItem(L, harvest);
+    const endP = end(ctx, 0.55);
+    await Promise.all([moveTo(L, V(-0.12, -0.15, -0.36), 0.4), moveTo(R, POSE.rest, 0.45, ease, REST.tilt, REST.roll)]);
+    await tween(0.25, () => {});
+    await moveTo(L, POSE.lAway, 0.4);
+    L.g.visible = false;
+    setItem(L, null);
+    await endP;
+    restore();
+  }
+
+  // fabriquer un outil dans les mains
+  async function craft(kind, onDone) {
+    const p0 = await lookAtHands(kind === 'lance' ? -0.55 : -0.72);
+    both((a) => { a.g.visible = true; a.pose.roll = 0; a.pose.tilt = 0; });
+    if (kind === 'couteau') {
+      // taille du silex : la gauche tient le rognon, la droite frappe le bord avec l'autre silex
+      setItem(L, 'silex'); setItem(R, 'silex');
+      L.pose.p.copy(POSE.lAway); R.pose.p.copy(POSE.away);
+      const core = V(-0.035, -0.095, -0.34);
+      await Promise.all([moveTo(L, core, 0.5, ease, 0.4, 1.4), moveTo(R, V(0.09, -0.01, -0.31), 0.5, ease, 0.3, -0.4)]);
+      for (let i = 0; i < 6; i++) {
+        const hit = V(0.012 - i * 0.004, -0.078, -0.335);
+        await moveTo(R, hit, 0.11, easeOut);
+        root.updateMatrixWorld(true);
+        chips(root.worldToLocal(L.grip.getWorldPosition(new THREE.Vector3())).add(V(0.02, 0.02, 0)), 5 + (i % 3));
+        onTick?.('knap');
+        L.pose.p.y -= 0.004;
+        await moveTo(R, V(0.09 - i * 0.003, -0.005, -0.31), 0.32);
+        L.pose.roll = 1.4 + (i % 2 ? 0.15 : -0.15); // on tourne un peu le rognon entre deux coups
+        L.pose.p.y = core.y;
+      }
+      setItem(L, 'couteau');
+      setItem(R, null);
+      onDone?.();
+      // on regarde la lame obtenue
+      await Promise.all([moveTo(L, V(-0.02, -0.06, -0.3), 0.5, ease, 0.1, 0.4), moveTo(R, POSE.away, 0.4)]);
+      await tween(0.4, (k) => { L.pose.roll = 0.4 + Math.sin(k * Math.PI) * 0.6; });
+    } else if (kind === 'corde') {
+      // tresser : les deux mains tordent les fibres en sens contraire et s'écartent ; le cordon s'allonge
+      setItem(L, 'fibre'); setItem(R, null);
+      L.pose.p.copy(POSE.lAway); R.pose.p.copy(POSE.away);
+      await Promise.all([moveTo(L, V(-0.03, -0.09, -0.36), 0.45, ease, 0.4, 1.2), moveTo(R, V(0.03, -0.09, -0.36), 0.45, ease, 0.4, -1.2)]);
+      setItem(L, null);
+      strand.visible = true;
+      let tw = 0;
+      for (let i = 0; i < 5; i++) {
+        const spread = 0.03 + (i + 1) * 0.022;
+        await tween(0.38, (k) => {
+          const e = ease(k);
+          L.pose.roll = 1.2 + Math.sin(e * Math.PI) * 0.9;
+          R.pose.roll = -1.2 - Math.sin(e * Math.PI) * 0.9;
+          L.pose.p.x = lerp(-spread + 0.022, -spread, e);
+          R.pose.p.x = lerp(spread - 0.022, spread, e);
+          tw += 0.18;
+          updateStrand(tw);
+        });
+        onTick?.('twist');
+      }
+      strand.visible = false;
+      setItem(R, 'corde');
+      onDone?.();
+      await Promise.all([moveTo(R, V(0.05, -0.06, -0.31), 0.45, ease, 0.2, -0.2), moveTo(L, POSE.lAway, 0.45)]);
+      await tween(0.45, () => {});
+    } else if (kind === 'lance') {
+      // ligature : la lance posée en travers devant soi, la gauche la tient, la droite enroule la corde autour de la lame
+      const dir = V(0.82, 0.18, -0.55).normalize();
+      const knot = V(0.07, -0.07, -0.42);
+      prop.geometry = itemGeometry('lance');
+      prop.material = matFor('lance');
+      prop.quaternion.setFromUnitVectors(V(0, 1, 0), dir);
+      prop.position.copy(knot).addScaledVector(dir, -1.6);
+      prop.visible = true;
+      prop.scale.setScalar(0.001);
+      setItem(L, null); setItem(R, 'corde');
+      L.pose.p.copy(POSE.lAway); R.pose.p.copy(POSE.away);
+      const hold = knot.clone().addScaledVector(dir, -0.26).add(V(0, -0.02, 0));
+      await Promise.all([moveTo(L, hold, 0.5, ease, 0.3, 1.0), moveTo(R, knot.clone().add(V(0.02, 0.06, 0.04)), 0.5),
+        tween(0.35, (k) => prop.scale.setScalar(Math.max(0.001, ease(k))))]);
+      for (let i = 0; i < 4; i++) {
+        await tween(0.42, (k) => {
+          const a = k * Math.PI * 2, along = -i * 0.012;
+          R.pose.p.copy(knot).addScaledVector(dir, along).add(V(Math.sin(a) * 0.012, Math.cos(a) * 0.045 + 0.01, Math.sin(a) * 0.035));
+          R.pose.roll = -0.4 + Math.sin(a) * 0.7;
+        });
+        onTick?.('wrap');
+      }
+      setItem(R, null);
+      onDone?.();
+      // on soupèse la lance terminée
+      await moveTo(R, POSE.away, 0.4);
+      await tween(0.6, (k) => {
+        const lift = Math.sin(k * Math.PI) * 0.03;
+        prop.position.copy(knot).addScaledVector(dir, -1.6).add(V(0, lift, 0));
+        L.pose.p.copy(hold).add(V(0, lift, 0));
+      });
+      await Promise.all([moveTo(L, POSE.lAway, 0.4), tween(0.35, (k) => prop.scale.setScalar(Math.max(0.001, 1 - ease(k))))]);
+      prop.visible = false;
+    }
+    // les mains redescendent
+    await Promise.all([moveTo(L, POSE.lAway, 0.4), moveTo(R, POSE.away, 0.4)]);
+    L.g.visible = false;
+    setItem(L, null);
+    await lookUp(p0);
+    restore();
+  }
+  let onTick = null;
+
   // pierre à feu : à genoux près du feu, la main droite tient la tige pointée sur
   // les brindilles, la gauche gratte la tige vers le bas avec le grattoir
   const rodW = new THREE.Vector3();
@@ -334,6 +534,7 @@ export function createHands({ camera, controls }) {
     }
     placeArm(R, SHOULDER.r);
     placeArm(L, SHOULDER.l);
+    updateFlakes(dt);
     // lumière : ciel, soleil, et la lueur d'un feu proche
     if (light) {
       amb.intensity = 0.18 + 0.32 * light.day;
@@ -349,12 +550,12 @@ export function createHands({ camera, controls }) {
     }
   }
   function render(renderer) {
-    if (!R.g.visible && !L.g.visible) return;
+    if (!R.g.visible && !L.g.visible && !prop.visible) return;
     // (r169 n'efface la profondeur que si l'écriture est permise : le dernier objet dessiné peut l'avoir coupée)
     renderer.state.buffers.depth.setMask(true);
     renderer.clearDepth();
     renderer.render(scene, camera);
   }
 
-  return { update, render, pickup, place, strike, fill, consume, setHeld, get busy() { return busy; }, _arms: { R, L, root, scene, STRIKE, REST, BATON, CONSUME, setItem } };
+  return { update, render, pickup, place, strike, fill, consume, cut, craft, setTick(fn) { onTick = fn; }, setHeld, get busy() { return busy; }, _arms: { R, L, root, scene, STRIKE, REST, BATON, CONSUME, setItem } };
 }

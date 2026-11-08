@@ -14,6 +14,8 @@ export function createControls(camera, dom, colliders, { eye = 1.6, radius = 0.2
     enabled: false,
     frozen: false, // pendant un geste (ramasser, poser, allumer) : on ne bouge pas
     crouch: 0, // de combien on s'accroupit (m)
+    speedMul: 1, // fatigue : on avance moins vite
+    lie: null, // couché (dormir) : { x, y, z, yaw, pitch, roll } impose la caméra
   };
   const SPEED = 1.7, LOOK = 0.0042;
 
@@ -86,6 +88,13 @@ export function createControls(camera, dom, colliders, { eye = 1.6, radius = 0.2
 
   const fwd = new THREE.Vector3(), right = new THREE.Vector3(), want = new THREE.Vector3();
   function update(dt) {
+    if (st.lie) {
+      // couché : la caméra est posée là, on ne bouge pas
+      camera.position.set(st.lie.x, st.lie.y, st.lie.z);
+      camera.rotation.set(st.lie.pitch, st.lie.yaw, st.lie.roll || 0, 'YXZ');
+      st.vel.set(0, 0, 0);
+      return;
+    }
     let f = 0, s = 0;
     if (st.enabled && !st.frozen) {
       if (st.keys.has('f')) f += 1;
@@ -98,7 +107,8 @@ export function createControls(camera, dom, colliders, { eye = 1.6, radius = 0.2
     if (len > 1) { f /= len; s /= len; }
     fwd.set(-Math.sin(st.yaw), 0, -Math.cos(st.yaw));
     right.set(Math.cos(st.yaw), 0, -Math.sin(st.yaw));
-    want.copy(fwd).multiplyScalar(f * SPEED).addScaledVector(right, s * SPEED);
+    const sp = SPEED * st.speedMul;
+    want.copy(fwd).multiplyScalar(f * sp).addScaledVector(right, s * sp);
     // accélération douce, pas d'à-coups
     st.vel.lerp(want, 1 - Math.exp(-dt * 7));
     st.pos.addScaledVector(st.vel, dt);

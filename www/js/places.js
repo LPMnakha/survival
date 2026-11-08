@@ -241,7 +241,14 @@ export function createPlaces(scene, { forest, items, shadows = true }) {
       B.box(0.37, y, 1.75 - y * 0.29 - 0.02, 0.73, y + 0.04, 1.75 - y * 0.29 + 0.02, 0x786654);
     }
     B.collideLocal(0.3, 0.9, 0.8, 1.8);
+    // petite boîte en bois clouée au poteau, à hauteur de main (la carte y est restée)
+    B.box(-0.91, 1.0, 0.6, -0.89, 1.32, 1.0, 0x6e5a45); // fond, contre le poteau
+    B.box(-1.04, 1.04, 0.6, -0.89, 1.07, 1.0, 0x5c4a38); // fond de la boîte
+    B.box(-1.06, 1.3, 0.58, -0.89, 1.33, 1.02, 0x5c4a38); // petit toit
+    B.box(-1.04, 1.04, 0.6, -0.89, 1.3, 0.62, 0x6e5a45); // côtés
+    B.box(-1.04, 1.04, 0.98, -0.89, 1.3, 1.0, 0x6e5a45);
   });
+  loot.push({ id: 'mir-carte', type: 'carte', p: toWorld(mir, -0.965, 1.072, 0.8), rot: mir.rot });
   loot.push({ id: 'mir-brindille-1', type: 'brindille', p: toWorld(mir, -0.3, 0.03, 0.2), rot: 1.2 });
   loot.push({ id: 'mir-brindille-2', type: 'brindille', p: toWorld(mir, 0.1, 0.03, -0.35), rot: 2.6 });
 

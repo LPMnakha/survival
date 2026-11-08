@@ -693,7 +693,8 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
   })();
   const fernSpots = scatter(Math.round((mobile ? 1100 : 2200) * AREA), (x, z, d, cl) => (1 - cl) * (0.3 + 0.7 * smooth(10, 2, d)) * (NZ.fbm(x * 0.05 - 7, z * 0.05 + 3, 2) > -0.1 ? 1 : 0.25) * (season.name === 'hiver' ? 0.5 : 1))
     .filter((t) => !nearSpawn(t.x, t.z, 3) && gClear(t.x, t.z, 0.35));
-  chunked(fernGeo, fernMat, fernSpots.map((t) => ({ x: t.x, y: t.h - 0.08, z: t.z, s: (1.1 + rnd() * 0.8) * (season.name === 'hiver' ? 0.8 : 1), rot: rnd() * 6.28 })), { color: () => tint.set(pick(P.fern)).multiplyScalar(0.9 + rnd() * 0.25), size: 27, far: 64, group: 'ferns' });
+  const fernList = fernSpots.map((t) => ({ x: t.x, y: t.h - 0.08, z: t.z, s: (1.1 + rnd() * 0.8) * (season.name === 'hiver' ? 0.8 : 1), rot: rnd() * 6.28 }));
+  chunked(fernGeo, fernMat, fernList, { color: () => tint.set(pick(P.fern)).multiplyScalar(0.9 + rnd() * 0.25), size: 27, far: 64, group: 'ferns' });
   if (season.name === 'automne') {
     const lv = scatter(Math.round((mobile ? 1600 : 3200) * AREA), (x, z, d, cl) => (leafy(x, z) ? 1 : 0.15) * (1 - cl * 0.7));
     const lGeo = new THREE.CircleGeometry(0.08, 4).rotateX(-Math.PI / 2);
@@ -863,6 +864,6 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
     update, groundAt, clamp, surfaceAt, colliders, streamDist: streamD, spawn: SPAWN,
     // pour les objets au sol et le feu de camp
     clearingAt, leafy, blocked, isFree: gClear, addLod, chunked, inWalk, addCollider, nearSite, sites: SITES, snowy,
-    snowShown: () => snowShown, _lods: lods, _hidden: hiddenGroups, tiles,
+    snowShown: () => snowShown, _lods: lods, _hidden: hiddenGroups, tiles, ferns: fernList, swayMaterial: sway, streamX,
   };
 }

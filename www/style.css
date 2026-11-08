@@ -186,3 +186,52 @@ canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block;
   appearance: none; border: 1px solid rgba(233, 160, 97, 0.55); cursor: pointer;
   background: rgba(233, 160, 97, 0.16); color: var(--ink); font: inherit; font-size: 17px; padding: 12px 34px; border-radius: 999px;
 }
+
+#need-sommeil .bar { stroke: #b6a8e6; }
+#need-sommeil .ico { fill: #e3dcf6; }
+
+/* dormir */
+#sleep {
+  position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; z-index: 15;
+  background: radial-gradient(ellipse at 50% 45%, rgba(18, 14, 30, 0.6), rgba(8, 6, 14, 0.9));
+  opacity: 0; transition: opacity 2.4s ease;
+}
+#sleep[hidden] { display: none; }
+#sleep.on { opacity: 1; }
+#sleep h2 { font-weight: 600; font-size: 24px; margin: 4px 0 10px; }
+.sleep-moon { margin: 0; opacity: 0.9; }
+#sleep-level { margin: 0 0 6px; font-size: 16px; color: var(--ink); }
+#sleep-note { margin: 0 0 26px; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+#btn-wake {
+  appearance: none; border: 1px solid rgba(182, 168, 230, 0.5); cursor: pointer;
+  background: rgba(182, 168, 230, 0.14); color: var(--ink); font: inherit; font-size: 17px; padding: 12px 36px; border-radius: 999px;
+}
+#btn-wake:disabled { opacity: 0.4; cursor: default; }
+
+/* onglets de la fenêtre Fabriquer */
+.tabs { display: flex; gap: 6px; margin: -2px 0 12px; padding: 3px; border-radius: 999px; background: rgba(244, 233, 218, 0.06); }
+.tab {
+  appearance: none; border: 0; cursor: pointer; font: inherit; font-size: 14px; color: var(--ink-soft);
+  padding: 7px 18px; border-radius: 999px; background: none; transition: background 0.3s ease, color 0.3s ease;
+}
+.tab.on { background: rgba(233, 160, 97, 0.28); color: var(--ink); }
+#recipes { display: flex; flex-direction: column; gap: 8px; width: 100%; max-height: 52vh; overflow-y: auto; }
+.recipe.missing .r-name { color: var(--ink-soft); }
+.recipe .r-ico svg { width: 100%; height: 100%; display: block; }
+
+/* la carte */
+#map {
+  position: fixed; inset: 0; z-index: 12; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: rgba(14, 10, 7, 0.78); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  opacity: 0; transition: opacity 0.35s ease; padding: 12px;
+}
+#map[hidden] { display: none; }
+#map.on { opacity: 1; }
+#map-canvas { border-radius: 6px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45); touch-action: none; cursor: crosshair; }
+.map-tools { display: flex; gap: 8px; }
+.map-tools button {
+  appearance: none; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer;
+  padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(244, 233, 218, 0.25); background: rgba(20, 13, 9, 0.5);
+}
+.map-tools button.on { background: rgba(233, 160, 97, 0.32); border-color: rgba(233, 160, 97, 0.6); }
+#map:not(.on) { pointer-events: none; }

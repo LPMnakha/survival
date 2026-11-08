@@ -12,9 +12,16 @@ export const ITEMS = {
   bouteille: { one: 'bouteille', many: 'bouteilles', stack: 1 },
   sacoche: { one: 'sacoche', many: 'sacoches', stack: 1, wear: 'sac' },
   baies: { one: 'poignée de baies', many: 'poignées de baies', stack: 10 },
+  silex: { one: 'silex', many: 'silex', stack: 10 },
+  feuille: { one: 'feuille', many: 'feuilles', stack: 10 },
+  fibre: { one: 'fibre', many: 'fibres', stack: 10 },
+  corde: { one: 'corde', many: 'cordes', stack: 10 },
+  couteau: { one: 'couteau artisanal', many: 'couteaux artisanaux', stack: 1 },
+  lance: { one: 'lance', many: 'lances', stack: 1 },
+  carte: { one: 'carte', many: 'cartes', stack: 1 },
 };
 // « un caillou », « une bâche »…
-const FEM = new Set(['brindille', 'pierre-a-feu', 'bache', 'bouteille', 'sacoche', 'baies']);
+const FEM = new Set(['brindille', 'pierre-a-feu', 'bache', 'bouteille', 'sacoche', 'baies', 'feuille', 'fibre', 'corde', 'lance', 'carte']);
 export const anItem = (type) => (FEM.has(type) ? 'une ' : 'un ') + ITEMS[type].one;
 export const theItem = (type) => (FEM.has(type) ? 'cette ' : type === 'baies' ? 'ces ' : 'ce ') + ITEMS[type].one;
 export const itemName = (type, n = 1) => (n > 1 ? ITEMS[type].many : ITEMS[type].one);
@@ -24,6 +31,11 @@ const cache = {};
 export function itemGeometry(type, variant = 0) {
   const key = type + variant;
   if (cache[key]) return cache[key];
+  if ((type === 'couteau' || type === 'lance') && variant === 1) {
+    const lying = itemGeometry(type, 0).clone().rotateZ(-Math.PI / 2).translate(type === 'lance' ? -0.85 : -0.07, 0.022, 0);
+    cache[key] = lying;
+    return lying;
+  }
   let g;
   if (type === 'caillou') {
     const s = [1, 1.12, 0.92][variant % 3];
@@ -87,6 +99,76 @@ export function itemGeometry(type, variant = 0) {
       parts.push([new THREE.IcosahedronGeometry(0.011, 0).translate(Math.cos(a) * r, 0.024 + (k % 2) * 0.01, Math.sin(a) * r), k % 4 ? 0xb3263a : 0x8e1c34]);
     }
     g = mergeColored(parts);
+  } else if (type === 'silex') {
+    // rognon de silex : noir bleuté, éclats nets, un reste de cortex crayeux
+    const b = new THREE.IcosahedronGeometry(0.055, 0);
+    const p = b.attributes.position;
+    for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) * (1.3 + 0.25 * Math.sin(i * 1.7 + variant)), p.getY(i) * 0.7, p.getZ(i) * (0.95 + 0.2 * Math.cos(i * 2.3)));
+    b.computeVertexNormals();
+    b.translate(0, 0.035, 0);
+    const n = b.attributes.position.count, cc = new Float32Array(n * 3), c = new THREE.Color();
+    for (let i = 0; i < n; i += 3) {
+      const cortex = b.attributes.position.getY(i) > 0.05 && i % 4 === 0;
+      c.set(cortex ? 0xd8d2c4 : [0x3a3c45, 0x2f3139, 0x464955][(i / 3) % 3]);
+      for (let k = 0; k < 3; k++) cc.set([c.r, c.g, c.b], (i + k) * 3);
+    }
+    b.setAttribute('color', new THREE.BufferAttribute(cc, 3));
+    g = b;
+  } else if (type === 'couteau') {
+    // lame de silex taillée (axe +y), retouchée sur les bords, talon gainé de fibres
+    const blade = new THREE.BufferGeometry();
+    const P = [[0, 0.17, 0], [0.022, 0.06, 0.006], [0.018, 0.0, 0], [-0.018, 0.0, 0], [-0.016, 0.07, 0.004], [0, 0.08, 0.012], [0, 0.08, -0.008]];
+    const tri = [[0, 1, 5], [0, 5, 4], [1, 2, 5], [2, 3, 5], [3, 4, 5], [0, 4, 6], [0, 6, 1], [1, 6, 2], [2, 6, 3], [3, 6, 4]];
+    const pos = [];
+    for (const t of tri) for (const k of t) pos.push(...P[k]);
+    blade.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    blade.computeVertexNormals();
+    const wrap = new THREE.CylinderGeometry(0.02, 0.021, 0.06, 7).scale(1, 1, 0.55).translate(0, -0.02, 0);
+    const knot = new THREE.TorusGeometry(0.02, 0.004, 4, 8).rotateX(Math.PI / 2).scale(1, 1, 0.6).translate(0, 0.008, 0);
+    g = mergeColored([[blade, 0x3a3c45], [wrap, 0xa89268], [knot, 0x8a7550]]);
+  } else if (type === 'lance') {
+    // bâton droit (axe +y, 1,7 m) avec la lame de silex ligaturée au bout
+    const shaft = new THREE.CylinderGeometry(0.016, 0.02, 1.62, 6).translate(0, 0.81, 0);
+    const tip = new THREE.ConeGeometry(0.022, 0.13, 4).scale(1, 1, 0.4).translate(0, 1.68, 0);
+    const lash = new THREE.CylinderGeometry(0.021, 0.021, 0.07, 6).translate(0, 1.6, 0);
+    const lash2 = new THREE.TorusGeometry(0.02, 0.004, 4, 8).rotateX(Math.PI / 2).translate(0, 1.57, 0);
+    g = mergeColored([[shaft, 0x6a5240], [tip, 0x3a3c45], [lash, 0xa89268], [lash2, 0x8a7550]]);
+  } else if (type === 'feuille') {
+    // grande fronde de fougère posée à plat (axe long selon x)
+    const parts = [[new THREE.BoxGeometry(0.36, 0.004, 0.008).translate(0, 0.006, 0), 0x5f8a3e]];
+    for (let k = 0; k < 9; k++) {
+      const x = -0.15 + k * 0.035, L = 0.075 * Math.sin(Math.PI * (k + 1) / 10);
+      for (const s of [-1, 1]) {
+        const pin = new THREE.BoxGeometry(0.016, 0.003, L).translate(0, 0.006, s * L / 2).rotateY(s * 0.35).translate(x, 0, 0);
+        parts.push([pin, k % 2 ? 0x77a84e : 0x6a9a46]);
+      }
+    }
+    g = mergeColored(parts);
+  } else if (type === 'fibre') {
+    // botte de fibres végétales, nouée au milieu
+    const parts = [];
+    for (let k = 0; k < 7; k++) {
+      const f = new THREE.CylinderGeometry(0.0025, 0.0025, 0.3, 3).rotateZ(Math.PI / 2 + (k - 3) * 0.04).translate(0, 0.006 + (k % 3) * 0.003, (k - 3) * 0.004);
+      parts.push([f, k % 2 ? 0xb9b07a : 0xa59c66]);
+    }
+    parts.push([new THREE.TorusGeometry(0.012, 0.003, 4, 8).rotateY(Math.PI / 2).translate(0, 0.009, 0), 0x7f774c]);
+    g = mergeColored(parts);
+  } else if (type === 'corde') {
+    // corde enroulée (bobine plate)
+    const parts = [];
+    for (let k = 0; k < 3; k++) parts.push([new THREE.TorusGeometry(0.05 - k * 0.012, 0.008, 5, 14).rotateX(Math.PI / 2).translate(0, 0.009 + k * 0.004, 0), k % 2 ? 0xa48d62 : 0xb59e70]);
+    parts.push([new THREE.CylinderGeometry(0.006, 0.006, 0.06, 4).rotateZ(Math.PI / 2).translate(0.07, 0.008, 0.02), 0xa48d62]);
+    g = mergeColored(parts);
+  } else if (type === 'carte') {
+    // carte pliée en trois, papier jauni, quelques traits à l'encre
+    const parts = [];
+    for (let k = 0; k < 3; k++) {
+      const p = new THREE.BoxGeometry(0.055, 0.004, 0.13).rotateZ((k - 1) * 0.08).translate((k - 1) * 0.054, 0.004 + (k === 1 ? 0.001 : 0), 0);
+      parts.push([p, k === 1 ? 0xe6d8b6 : 0xdccca6]);
+    }
+    for (let k = 0; k < 4; k++) parts.push([new THREE.BoxGeometry(0.03 + (k % 2) * 0.02, 0.0012, 0.003).translate(-0.04 + k * 0.028, 0.0068, -0.03 + (k % 3) * 0.025), 0x6a5038]);
+    parts.push([new THREE.BoxGeometry(0.004, 0.0012, 0.09).rotateY(0.4).translate(0.01, 0.0068, 0.005), 0x3d6b86]);
+    g = mergeColored(parts);
   } else if (type === 'grattoir') {
     const plate = new THREE.BoxGeometry(0.06, 0.03, 0.004);
     const edge = new THREE.BoxGeometry(0.06, 0.005, 0.0045).translate(0, 0.015, 0);
@@ -99,7 +181,7 @@ export function itemGeometry(type, variant = 0) {
 export const itemMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true });
 export const metalMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.5, flatShading: true });
 export const plasticMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, flatShading: true });
-export const matFor = (type) => (type === 'pierre-a-feu' || type === 'grattoir' ? metalMaterial : type === 'bouteille' || type === 'bache' ? plasticMaterial : itemMaterial);
+export const matFor = (type) => (type === 'pierre-a-feu' || type === 'grattoir' ? metalMaterial : type === 'bouteille' || type === 'bache' || type === 'silex' || type === 'couteau' ? plasticMaterial : itemMaterial);
 
 // petites icônes (SVG en ligne) pour l'inventaire
 export const ICONS = {
@@ -109,6 +191,13 @@ export const ICONS = {
   bache: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 11.5 16 8l11 3.5v9L16 24 5 20.5z" fill="#3f7fb8"/><path d="M5 11.5 16 8l11 3.5L16 15z" fill="#5a98cc"/><circle cx="7.5" cy="13" r="1.1" fill="#d6dade"/><circle cx="24.5" cy="13" r="1.1" fill="#d6dade"/></svg>',
   sacoche: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 12a7 7 0 0 1 14 0" fill="none" stroke="#5e4e35" stroke-width="2"/><rect x="6" y="12" width="20" height="14" rx="3" fill="#7a6747"/><path d="M6 15a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v3H6z" fill="#665538"/><rect x="14.5" y="16.5" width="3" height="3" rx=".6" fill="#c9b27e"/></svg>',
   baies: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 22c3-8 9-12 18-13-3 7-9 11-18 13z" fill="#5f8f42"/><g fill="#c2304a"><circle cx="11" cy="19" r="3.2"/><circle cx="16.5" cy="21.5" r="3"/><circle cx="14" cy="15" r="2.8"/><circle cx="19.5" cy="16.5" r="2.6"/></g><g fill="#f4b3bd"><circle cx="10" cy="18" r=".8"/><circle cx="15.6" cy="20.6" r=".7"/><circle cx="13.2" cy="14.2" r=".7"/></g></svg>',
+  silex: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 19 10 10l9-3 7 6-2 9-11 3z" fill="#3a3c45"/><path d="M10 10l9-3 7 6-9 2z" fill="#5a5d6a"/><path d="M6 19l4-9 7 5-4 10z" fill="#2c2e35"/><path d="M19 7l4 1-2 3z" fill="#ddd6c6"/></svg>',
+  couteau: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M23 4 26.5 7 14 20l-3-1z" fill="#4a4d58"/><path d="M23 4l3.5 3-6 6z" fill="#6b6f7c"/><path d="M11 19l3 1-4 6.5c-.8 1.2-2.6.6-2.5-.8z" fill="#b39d72"/><path d="M9.3 21.5l3 1.5M8.5 23.5l2.7 1.4" stroke="#8a7550" stroke-width="1.1"/></svg>',
+  lance: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 28 22 10" stroke="#7a5e45" stroke-width="2.6" stroke-linecap="round"/><path d="M27.5 4.5 21 8l3 3z" fill="#4a4d58"/><path d="M20 10.5l2.5 2.5" stroke="#b39d72" stroke-width="3.2"/></svg>',
+  feuille: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 27C8 15 15 8 27 5" fill="none" stroke="#5f8a3e" stroke-width="1.6" stroke-linecap="round"/><g fill="#79aa50"><path d="M9 21l-4.5-1 2.5 3.5zM9 21l1.5 4.5 1.5-4zM13 16l-4.5-1.5 2.8 3.7zM13 16l1.8 4.6 1.2-4.3zM17.5 12l-4.2-1.8 2.8 3.5zM17.5 12l2 4.2 1-4zM22 8.5l-3.6-1.8 2.4 3zM22 8.5l1.7 3.6.9-3.4z"/></g></svg>',
+  fibre: '<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke-linecap="round" stroke-width="1.4"><path d="M4 20c8-3 16-5 24-9" stroke="#b9b07a"/><path d="M4 22c8-2 16-5 24-8" stroke="#a59c66"/><path d="M5 24c8-3 15-6 23-10" stroke="#c6be8a"/></g><path d="M14.5 15.5l2.5 6" stroke="#7f774c" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  corde: '<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke-width="2.6"><circle cx="16" cy="16" r="10" stroke="#b59e70"/><circle cx="16" cy="16" r="6.2" stroke="#a48d62"/><circle cx="16" cy="16" r="2.6" stroke="#b59e70"/></g><path d="M25 19c2 1 3 3 3.5 6" fill="none" stroke="#a48d62" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  carte: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 8l8-3 8 3 8-3v19l-8 3-8-3-8 3z" fill="#e6d8b6"/><path d="M12 5v19M20 8v19" stroke="#bfae86" stroke-width="1"/><path d="M6 14c3-2 5 1 8-1s5-3 8-1 3 1 4 0" fill="none" stroke="#3d6b86" stroke-width="1.4" stroke-linecap="round"/><path d="M15 19l2 2m0-2-2 2" stroke="#8a3a2a" stroke-width="1.4" stroke-linecap="round"/></svg>',
   'pierre-a-feu': '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="13" y="16" width="6.5" height="12" rx="2.5" fill="#9a6a42"/><rect x="14.6" y="3.5" width="3.3" height="13" rx="1.2" fill="#55575e"/><g fill="#f0b46a"><circle cx="23" cy="6" r="1.1"/><circle cx="25.5" cy="10" r="0.8"/><circle cx="22" cy="11" r="0.7"/></g></svg>',
 };
 
