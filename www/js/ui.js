@@ -5,17 +5,18 @@ import * as THREE from '../vendor/three.module.min.js';
 import { RECIPE } from './campfire.js';
 import { RECIPE2 } from './collector.js';
 import { RECIPE3 } from './shelter.js';
+import { RECIPE5, WEAVES } from './loom.js';
 import { itemName, theItem, anItem, ICONS } from './models.js';
 import { YIELD } from './plants.js';
 import { NEEDS } from './needs.js';
 
 const SIP = 250;
 
-export function createUI({ canvas, camera, controls, inventory, items, campfires, collectors, shelters, berries, plants, rabbits, spears, needs, sleep, forest, hands, getAudio }) {
+export function createUI({ canvas, camera, controls, inventory, items, campfires, collectors, shelters, looms, berries, plants, rabbits, spears, needs, sleep, forest, hands, getAudio }) {
   const $ = (id) => document.getElementById(id);
   const pill = $('hint-pill'), actions = $('actions'), craft = $('craft-sheet'), recipes = $('recipes');
   const st = controls.state;
-  const builds = [campfires, collectors, shelters];
+  const builds = [campfires, collectors, shelters, looms];
   const placingMod = () => builds.find((b) => b.placing);
 
   // ------------------------------------------------------------------ petit message en haut
@@ -49,6 +50,7 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
   // ------------------------------------------------------------------ fabriquer
   const fireIcon = '<svg class="r-ico" viewBox="0 0 40 40" aria-hidden="true"><g fill="#a39e95"><ellipse cx="9" cy="31" rx="4" ry="2.6"/><ellipse cx="17" cy="33" rx="4" ry="2.6"/><ellipse cx="25" cy="33" rx="4" ry="2.6"/><ellipse cx="32" cy="30.5" rx="4" ry="2.6"/></g><g stroke="#7a5e45" stroke-width="2.6" stroke-linecap="round"><path d="M11 29 20 9M29 29 20 9"/></g><path d="M20 15c3 4 5 6 5 10a5 5 0 0 1-10 0c0-3 2-4 2-7 1 2 2 2 3 1-1-2-1-3 0-4z" fill="#e9a061"/></svg>';
   const rainIcon = '<svg class="r-ico" viewBox="0 0 40 40" aria-hidden="true"><g stroke="#7a5e45" stroke-width="2.4" stroke-linecap="round"><path d="M8 34 10 16M32 34 30 16"/></g><path d="M7 16h26c-4 7-8 9-13 9S11 23 7 16z" fill="#3f7fb8"/><path d="M14 19.5c2 1.8 4 2.5 6 2.5s4-.7 6-2.5" fill="none" stroke="#7fb8de" stroke-width="2" stroke-linecap="round"/><g fill="#9cc9e8"><path d="M14 5c1.2 1.8 2 2.8 2 3.8a2 2 0 0 1-4 0c0-1 .8-2 2-3.8z"/><path d="M24 3c1.2 1.8 2 2.8 2 3.8a2 2 0 0 1-4 0c0-1 .8-2 2-3.8z"/></g></svg>';
+  const loomIcon = '<svg class="r-ico" viewBox="0 0 40 40" aria-hidden="true"><g stroke="#7a5e45" stroke-width="2.4" stroke-linecap="round"><path d="M8 36 11 9M32 36 29 9M6 30h28M7 12h26"/></g><g stroke="#c3b78a" stroke-width="1.2"><path d="M13 12v18M17 12v18M21 12v18M25 12v18"/></g><path d="M12 23h16v7H12z" fill="#b3a679"/><g stroke="#8f8458" stroke-width="1"><path d="M12 25h16M12 27.5h16"/></g></svg>';
   const shelterIcon = '<svg class="r-ico" viewBox="0 0 40 40" aria-hidden="true"><path d="M5 31 20 12l15 19z" fill="#6f9a48"/><path d="M5 31 20 12l3 4-12 15z" fill="#5c853c"/><g stroke="#6b5240" stroke-width="2.4" stroke-linecap="round"><path d="M8 33 20 10M32 33 20 10M14 9l12 0"/></g><g fill="#9a968e"><ellipse cx="9" cy="33" rx="3" ry="2"/><ellipse cx="31" cy="33" rx="3" ry="2"/></g></svg>';
   const ico = (t) => `<span class="r-ico">${ICONS[t]}</span>`;
   // outils : fabriqués dans les mains ; structures : posées au sol pièce par pièce
@@ -61,7 +63,24 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
     { recipe: RECIPE, mod: campfires, icon: fireIcon },
     { recipe: RECIPE2, mod: collectors, icon: rainIcon },
     { recipe: RECIPE3, mod: shelters, icon: shelterIcon },
+    { recipe: RECIPE5, mod: looms, icon: loomIcon },
   ];
+  // la fenêtre du métier à tisser : ce qu'on peut y fabriquer
+  const loomSheet = $('loom-sheet'), loomList = $('loom-recipes');
+  loomSheet.querySelector('.sheet-close').addEventListener('click', () => loomSheet.classList.remove('on'));
+  looms.setMenu((site) => {
+    loomList.innerHTML = '';
+    for (const w of WEAVES) {
+      const need = { corde: w.warp + w.weft };
+      const b = document.createElement('button');
+      b.className = 'recipe' + (hasAll(need) ? '' : ' missing');
+      b.innerHTML = `${ico(w.out)}<span><span class="r-name">${w.name}</span><span class="r-needs">${needLine(need)}</span><span class="r-needs">${w.note}</span></span>`;
+      b.addEventListener('click', () => { loomSheet.classList.remove('on'); looms.choose(site, w.id); });
+      loomList.appendChild(b);
+    }
+    inventory.open(false); craft.classList.remove('on');
+    loomSheet.classList.add('on');
+  });
   let tab = 'outils';
   craft.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => {
     tab = b.dataset.tab;
@@ -233,7 +252,7 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
   let lastKnifeHint = 0;
   const P_HINT = () => { const t = performance.now(); if (t - lastKnifeHint < 20000) return false; lastKnifeHint = t; return true; };
   function tap(x, y) {
-    if (!st.enabled || hands.busy || placingMod() || sleep.busy) return;
+    if (!st.enabled || hands.busy || placingMod() || sleep.busy || looms.weaving) return;
     craft.classList.remove('on');
     const p = st.pos;
     // feux de camp et récupérateurs
@@ -348,6 +367,13 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
     combat.classList.toggle('on', inventory.heldType() === 'lance' && st.enabled && !sleep.busy && !pm && !(hands.busy && !combat.classList.contains('on')));
     $('aim').classList.toggle('on', combat.classList.contains('on'));
     if (sleep.busy) { setActions('', []); pill.classList.remove('on'); return; }
+    // tissage : avancement et bouton pour s'arrêter
+    if (looms.weaving) {
+      setActions('tisser', [{ label: 'Arrêter', fn: () => looms.stop() }]);
+      const pr = looms.progress();
+      if (pr && now >= hintUntil) { const m = Math.floor(pr.ms / 60e3), s = Math.floor((pr.ms % 60e3) / 1000); pill.textContent = `Tissage : ${m} min ${String(s).padStart(2, '0')} / ${Math.round(pr.total / 60e3)} min`; pill.classList.add('on'); }
+      return;
+    }
     if (pm) {
       setActions('placer', [
         { label: 'Placer ici', main: true, fn: () => { if (pm.confirmPlacement()) { setActions('', []); hint('Touche la preview pour poser les éléments un par un.', 4000); } } },

@@ -22,6 +22,7 @@ export const ITEMS = {
   peau: { one: 'peau de lapin', many: 'peaux de lapin', stack: 10 },
   viande: { one: 'viande crue', many: 'viandes crues', stack: 10 },
   'viande-cuite': { one: 'viande cuite', many: 'viandes cuites', stack: 10 },
+  tissu: { one: 'tissu en fibres naturelles', many: 'tissus en fibres naturelles', stack: 10 },
 };
 // ce qui se gâte (temps réel)
 export const PERISH = { viande: 2 * 864e5, 'viande-cuite': 4 * 864e5 };
@@ -195,6 +196,16 @@ export function itemGeometry(type, variant = 0) {
     const hide = new THREE.ExtrudeGeometry(shape, { depth: 0.012, bevelEnabled: false }).rotateX(-Math.PI / 2);
     const belly = new THREE.CircleGeometry(0.06, 7).scale(1.4, 1, 1).rotateX(-Math.PI / 2).translate(0, 0.0125, 0);
     g = mergeColored([[hide, 0x8a7a66], [belly, 0xc9bca4]]);
+  } else if (type === 'tissu') {
+    // carré de tissu plié en deux : trame grossière, deux tons de fibres, bords effilochés
+    const parts = [];
+    for (let k = 0; k < 7; k++) {
+      parts.push([new THREE.BoxGeometry(0.2, 0.006, 0.026).translate(0, 0.004, -0.09 + k * 0.03), k % 2 ? 0xbdb084 : 0xa89c6c]);
+      parts.push([new THREE.BoxGeometry(0.026, 0.0065, 0.2).translate(-0.09 + k * 0.03, 0.0045, 0), k % 2 ? 0xa89c6c : 0xc7bb90]);
+    }
+    parts.push([new THREE.BoxGeometry(0.2, 0.006, 0.2).translate(0.006, 0.011, 0.004), 0xb3a679]); // le pli
+    for (let k = 0; k < 5; k++) parts.push([new THREE.BoxGeometry(0.004, 0.003, 0.025).translate(-0.08 + k * 0.04, 0.003, 0.112), 0x9c9062]);
+    g = mergeColored(parts);
   } else if (type === 'grattoir') {
     const plate = new THREE.BoxGeometry(0.06, 0.03, 0.004);
     const edge = new THREE.BoxGeometry(0.06, 0.005, 0.0045).translate(0, 0.015, 0);
@@ -227,6 +238,7 @@ export const ICONS = {
   viande: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 11c4-5 13-6 17 0s1 13-6 13S3 16 7 11z" fill="#c4544f"/><path d="M11 10c3-2 8-2 11 1" fill="none" stroke="#f0d9cc" stroke-width="2" stroke-linecap="round"/><path d="M20 22l5 5" stroke="#e9e2d0" stroke-width="3" stroke-linecap="round"/><circle cx="26.5" cy="28" r="2" fill="#e9e2d0"/></svg>',
   'viande-cuite': '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 11c4-5 13-6 17 0s1 13-6 13S3 16 7 11z" fill="#8a4f2a"/><path d="M11 10c3-2 8-2 11 1" fill="none" stroke="#c89a5e" stroke-width="2" stroke-linecap="round"/><path d="M10 15l3 2M15 13l3 2M13 19l3 2" stroke="#5e3218" stroke-width="1.3" stroke-linecap="round"/><path d="M20 22l5 5" stroke="#e9e2d0" stroke-width="3" stroke-linecap="round"/><circle cx="26.5" cy="28" r="2" fill="#e9e2d0"/></svg>',
   peau: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 16l3-6 8-2 9 1 5 5-2 7-8 4-9-1-5-4z" fill="#8a7a66"/><ellipse cx="16" cy="16" rx="6" ry="4" fill="#c9bca4"/><path d="M8 12l2 1M22 11l-1 2M9 21l2-1" stroke="#6e604e" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  tissu: '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="6" width="20" height="20" rx="1.5" fill="#b3a679"/><g stroke="#8f8458" stroke-width="1.6"><path d="M6 10h20M6 14h20M6 18h20M6 22h20"/></g><g stroke="#cfc39a" stroke-width="1.6" stroke-dasharray="2 2"><path d="M10 6v20M14 6v20M18 6v20M22 6v20"/></g><path d="M8 26v3M12 26v2.5M16 26v3M20 26v2.5M24 26v3" stroke="#9c9062" stroke-width="1.2" stroke-linecap="round"/></svg>',
   'pierre-a-feu': '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="13" y="16" width="6.5" height="12" rx="2.5" fill="#9a6a42"/><rect x="14.6" y="3.5" width="3.3" height="13" rx="1.2" fill="#55575e"/><g fill="#f0b46a"><circle cx="23" cy="6" r="1.1"/><circle cx="25.5" cy="10" r="0.8"/><circle cx="22" cy="11" r="0.7"/></g></svg>',
 };
 

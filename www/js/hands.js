@@ -92,6 +92,7 @@ export function createHands({ camera, controls }) {
     else if (type === 'lance') { arm.item.visible = false; } // dessinée à part : voir spearMesh
     else if (type === 'viande' || type === 'viande-cuite') { arm.item.position.set(0, 0.02, 0.02); arm.item.rotation.set(0, Math.PI / 2, 0.4); }
     else if (type === 'peau') { arm.item.position.set(0, -0.03, 0.05); arm.item.rotation.set(Math.PI / 2 - 0.3, 0, 0.3); }
+    else if (type === 'tissu') { arm.item.position.set(0, -0.03, 0.05); arm.item.rotation.set(Math.PI / 2 - 0.3, 0, 0.2); }
     else if (type === 'grattoir') { arm.item.position.set(0.004, 0.012, 0.008); arm.item.rotation.set(0, Math.PI / 2, 0.3); }
   }
 
@@ -188,7 +189,9 @@ export function createHands({ camera, controls }) {
     setItem(R, type);
     R.g.visible = true;
     R.pose.roll = 0; R.pose.tilt = 0;
-    const ctx = await begin(target, { crouch: 0.82, approach: 0.9 });
+    // on s'accroupit moins pour poser en hauteur (broche, cadre du métier)
+    const above = target.y - controls.groundAt(target.x, target.z);
+    const ctx = await begin(target, { crouch: Math.max(0.05, Math.min(0.82, 0.82 - above * 0.75)), approach: 0.9 });
     const a = R.pose.p.clone(), b = reachTo(target);
     await tween(0.45, (k) => R.pose.p.lerpVectors(a, b, ease(k)));
     onRelease?.();
@@ -612,6 +615,43 @@ export function createHands({ camera, controls }) {
     restore();
   }
 
+  // tisser : la main droite passe la trame d'un bord à l'autre, dessus-dessous entre les fils de chaîne,
+  // la gauche tasse le rang (comme un peigne), puis la droite repart dans l'autre sens
+  async function weave(edges, running, onPass) {
+    busy = true;
+    setItem(R, 'corde'); setItem(L, null);
+    R.g.visible = true; L.g.visible = true;
+    R.pose.p.copy(POSE.away); L.pose.p.copy(POSE.lAway);
+    camera.updateMatrixWorld();
+    const loc = (w) => camera.worldToLocal(w.clone());
+    let e = edges();
+    await Promise.all([moveTo(R, loc(e.right), 0.5, ease, 0.7, -1.1), moveTo(L, loc(e.left).add(V(-0.04, -0.05, 0)), 0.5, ease, 0.6, 1.2)]);
+    let dir = -1;
+    while (running()) {
+      e = edges();
+      const from = loc(dir < 0 ? e.right : e.left), to = loc(dir < 0 ? e.left : e.right);
+      // passage de la trame : la main ondule devant/derrière les fils
+      await tween(1.25, (k) => {
+        R.pose.p.lerpVectors(from, to, ease(k));
+        R.pose.p.z += Math.sin(k * Math.PI * 12) * 0.012;
+        R.pose.roll = -1.1 + Math.sin(k * Math.PI * 12) * 0.25;
+      });
+      onPass?.();
+      if (!running()) break;
+      // la gauche tasse le rang vers le bas
+      const mid = loc(e.mid), lHome = L.pose.p.clone();
+      await moveTo(L, mid.clone().add(V(0, 0.04, 0.02)), 0.3, ease, 0.3, 0.6);
+      await moveTo(L, mid.clone().add(V(0, -0.015, 0.01)), 0.18, easeOut);
+      await moveTo(L, lHome, 0.3);
+      dir = -dir;
+    }
+    await Promise.all([moveTo(R, POSE.away, 0.45), moveTo(L, POSE.lAway, 0.45)]);
+    L.g.visible = false;
+    setItem(L, null);
+    busy = false;
+    restore();
+  }
+
   // ------------------------------------------------------------------ chaque image
   let phase = 0, wasSpear = false;
   const bob = new THREE.Vector3();
@@ -674,5 +714,5 @@ export function createHands({ camera, controls }) {
     renderer.render(scene, camera);
   }
 
-  return { update, render, pickup, place, strike, fill, consume, cut, craft, thrust, throwSpear, skin, setTick(fn) { onTick = fn; }, setHeld, get busy() { return busy; }, _arms: { R, L, root, scene, STRIKE, REST, BATON, CONSUME, SPEAR, LP, spearMesh, setItem } };
+  return { update, render, pickup, place, strike, fill, consume, cut, craft, thrust, throwSpear, skin, weave, setTick(fn) { onTick = fn; }, setHeld, get busy() { return busy; }, _arms: { R, L, root, scene, STRIKE, REST, BATON, CONSUME, SPEAR, LP, spearMesh, setItem } };
 }

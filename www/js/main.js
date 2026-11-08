@@ -17,6 +17,7 @@ import { createRain } from './rain.js';
 import { createCollectors } from './collector.js';
 import { createPlants } from './plants.js';
 import { createShelters } from './shelter.js';
+import { createLooms } from './loom.js';
 import { createSleep } from './sleep.js';
 import { createMap } from './map.js';
 import { createRabbits } from './rabbits.js';
@@ -79,11 +80,12 @@ const plants = createPlants(scene, { forest, season, saved: saved.plants, onChan
 const rabbits = createRabbits(scene, { forest, saved: saved.rabbits, onChange: changed });
 const spears = createSpears(scene, { forest, rabbits, getAudio: () => audio, hint: (t, ms) => ui?.hint(t, ms), onChange: changed, saved: saved.spears });
 const rain = createRain();
-let ui = null, collectors = null, shelters = null;
+let ui = null, collectors = null, shelters = null, looms = null;
 const hint = (t, ms) => ui?.hint(t, ms);
-const campfires = createCampfires(scene, { forest, inventory, hands, getAudio: () => audio, hint, onChange: changed, saved: saved.fires, others: () => [...(collectors?.sites || []), ...(shelters?.sites || [])] });
-collectors = createCollectors(scene, { forest, inventory, hands, rain, getAudio: () => audio, hint, onChange: changed, saved: saved.cols, others: () => [...campfires.sites, ...(shelters?.sites || [])] });
-shelters = createShelters(scene, { forest, inventory, hands, getAudio: () => audio, hint, onChange: changed, saved: saved.shelters, others: () => [...campfires.sites, ...collectors.sites] });
+const campfires = createCampfires(scene, { forest, inventory, hands, getAudio: () => audio, hint, onChange: changed, saved: saved.fires, others: () => [...(collectors?.sites || []), ...(shelters?.sites || []), ...(looms?.sites || [])] });
+collectors = createCollectors(scene, { forest, inventory, hands, rain, getAudio: () => audio, hint, onChange: changed, saved: saved.cols, others: () => [...campfires.sites, ...(shelters?.sites || []), ...(looms?.sites || [])] });
+shelters = createShelters(scene, { forest, inventory, hands, getAudio: () => audio, hint, onChange: changed, saved: saved.shelters, others: () => [...campfires.sites, ...collectors.sites, ...(looms?.sites || [])] });
+looms = createLooms(scene, { forest, inventory, hands, controls, getAudio: () => audio, hint, onChange: changed, saved: saved.looms, others: () => [...campfires.sites, ...collectors.sites, ...shelters.sites] });
 hands.setTick((k) => audio?.tick(k));
 
 // ---------- soif, faim, fin de partie (mort définitive)
@@ -120,10 +122,10 @@ const sleep = createSleep({ controls, needs, shelters, forest, hint, getAudio: (
 shelters.setSleepHandler((site) => sleep.start(site));
 needs.setCollapse(() => setTimeout(() => sleep.collapse()));
 sleep.restore(startAt);
-ui = createUI({ canvas, camera, controls, inventory, items, campfires, collectors, shelters, berries, plants, rabbits, spears, needs, sleep, forest, hands, getAudio: () => audio });
+ui = createUI({ canvas, camera, controls, inventory, items, campfires, collectors, shelters, looms, berries, plants, rabbits, spears, needs, sleep, forest, hands, getAudio: () => audio });
 const playerData = () => (controls.state.lie ? savedPlayer : (savedPlayer = { x: +controls.state.pos.x.toFixed(2), z: +controls.state.pos.z.toFixed(2), yaw: +controls.state.yaw.toFixed(3) }));
 let savedPlayer = startAt;
-saver = createSaver({ inv: inventory.data, items: items.data, fires: campfires.data, cols: collectors.data, shelters: shelters.data, berries: berries.data, plants: plants.data, needs: needs.data, player: playerData, map: map.data, rabbits: rabbits.data, spears: spears.data });
+saver = createSaver({ inv: inventory.data, items: items.data, fires: campfires.data, cols: collectors.data, shelters: shelters.data, berries: berries.data, plants: plants.data, needs: needs.data, player: playerData, map: map.data, rabbits: rabbits.data, spears: spears.data, looms: looms.data });
 setInterval(() => saver.soon(), 10000); // la position est sauvegardée régulièrement
 if (needs.dead) gameOver(needs.dead, true);
 
@@ -222,6 +224,7 @@ function frame(now) {
   rabbits.update(dt, p);
   spears.update(dt);
   shelters.update(dt, p, camera, controls.state.yaw);
+  looms.update(dt, p, camera, controls.state.yaw);
   sleep.update(dt);
   collectors.update(dt, p, camera, controls.state.yaw);
   if (!over) needs.update(dt, hint);
@@ -250,4 +253,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__survival = { forest, controls, sky, scene, camera, renderer, weather, inventory, items, hands, campfires, collectors, shelters, berries, plants, rabbits, spears, needs, sleep, map, rain, ui, saver, ready: true };
+window.__survival = { forest, controls, sky, scene, camera, renderer, weather, inventory, items, hands, campfires, collectors, shelters, berries, plants, rabbits, spears, looms, needs, sleep, map, rain, ui, saver, ready: true };
