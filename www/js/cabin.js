@@ -3,18 +3,18 @@
 // rondins de 2,5 m. Murs calfeutrés à la mousse, pignons, faîtage et pannes,
 // chevrons en bûches fendues, lattes en bâtons, toit couvert de feuilles, une
 // fenêtre à barreaux et une porte en bâtons qui s'ouvre (on y passe debout).
-// 147 étapes : chaque bûche est apportée sur l'épaule, le reste vient de l'inventaire.
+// 159 étapes : chaque bûche est apportée sur l'épaule, le reste vient de l'inventaire.
 import * as THREE from '../vendor/three.module.min.js';
 import { mergeColored, merge } from './builder.js';
 import { itemGeometry, itemMaterial, itemName } from './models.js';
 import { logGeometry } from './logs.js';
 
-export const RECIPE6 = { name: 'Cabane en rondins', needs: { buche: 111, mousse: 40, baton: 69, corde: 35, feuille: 150 } };
+export const RECIPE6 = { name: 'Cabane en rondins', needs: { buche: 123, mousse: 40, baton: 69, corde: 35, feuille: 150 } };
 
 const LX = 2.5, LZ = 1.25, RL = 0.075, RP = 0.085;
-const Y0 = 2 * RL, ROW = 0.15, ROWS = 11, WALL_TOP = Y0 + ROWS * ROW, PLATE_Y = WALL_TOP + RL, ROOF = WALL_TOP + 0.15;
+const Y0 = 2 * RL, ROW = 0.15, ROWS = 13, WALL_TOP = Y0 + ROWS * ROW, PLATE_Y = WALL_TOP + RL, ROOF = WALL_TOP + 0.15;
 const RIDGE_TOP = ROOF + 0.75, SLOPE = 0.6, EAVE = 1.55;
-const DOOR = { x0: 0.85, x1: 1.65 }, WIN = { x0: -1.55, x1: -0.95, r0: 6, r1: 8 };
+const DOOR = { x0: 0.85, x1: 1.65 }, WIN = { x0: -1.55, x1: -0.95, r0: 7, r1: 9 };
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const UP = THREE.Object3D.DEFAULT_UP;
 const qAlongZ = new THREE.Quaternion().setFromAxisAngle(UP, Math.PI / 2);
@@ -208,7 +208,9 @@ function buildPieces(ground) {
     for (let k = 0; k < 8; k++) { const x = (k + 0.5) * (w / 8); parts.push(stick(V(x, 0.02, 0), V(x, h, 0), 1.25)); }
     for (const y of [0.3, h - 0.3]) parts.push(stick(V(0, y, 0.035), V(w, y, 0.035), 1.1));
     for (const y of [0.3, h - 0.3]) parts.push(lashGeo().applyMatrix4(mat4(V(w * 0.5, y, 0.03), undefined, V(0.55, 0.55, 0.55))));
-    add({ phase: 'porte', door: true, cost: { baton: 10, corde: 2 }, hand: 'baton', geo: merge(parts), at: V((DOOR.x0 + DOOR.x1) / 2, (Y0 + WALL_TOP) / 2, LZ), w });
+    const geo = merge(parts);
+    // geo : dans le repère de la porte (charnière) ; placed : à sa place dans la façade (aperçu, chantier)
+    add({ phase: 'porte', door: true, cost: { baton: 10, corde: 2 }, hand: 'baton', geo, placed: geo.clone().applyMatrix4(mat4(V(DOOR.x0 + RP, Y0 + 0.02, LZ))), at: V((DOOR.x0 + DOOR.x1) / 2, (Y0 + WALL_TOP) / 2, LZ), w });
   }
   return P;
 }
@@ -236,7 +238,7 @@ export function createCabins(scene, { forest, inventory, hands, logs, getAudio, 
     return Math.min(...hs) + 0.35 * (Math.max(...hs) - Math.min(...hs)) - 0.02;
   };
 
-  const mergeOf = (list) => (list.length ? merge(list.map((p) => p.geo.clone())) : null);
+  const mergeOf = (list) => (list.length ? merge(list.map((p) => (p.placed || p.geo).clone())) : null);
   const setGeo = (m, g) => { if (m.geometry) m.geometry.dispose(); m.geometry = g || new THREE.BufferGeometry(); m.visible = !!g; };
   function rebuild(site, skip = -1) {
     const done = site.pieces.slice(0, site.placed).filter((p, i) => i !== skip && !p.door);
@@ -305,7 +307,7 @@ export function createCabins(scene, { forest, inventory, hands, logs, getAudio, 
 
   // ------------------------------------------------------------------ placer : la porte face à soi, par quarts de tour
   let preview = null;
-  const fullGeo = merge(buildPieces(() => 0).map((p) => p.geo.clone()));
+  const fullGeo = merge(buildPieces(() => 0).map((p) => (p.placed || p.geo).clone()));
   const ghost = new THREE.Mesh(fullGeo, ghostMat);
   ghost.visible = false;
   scene.add(ghost);
