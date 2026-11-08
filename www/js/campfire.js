@@ -6,10 +6,13 @@
 // Flammes, braises, halo et étincelles repris du feu de cheminée de Détente.
 import * as THREE from '../vendor/three.module.min.js';
 import { itemGeometry, itemMaterial, itemName } from './models.js';
+import { mergeColored } from './builder.js';
 import { glow } from './textures.js';
 
 const MIN = 60e3;
 export const FIRE = { first: 10 * MIN, add: 5 * MIN, max: 20 * MIN, tinder: 3, ember: 60e3, ignite: 8 };
+// broche : 2 morceaux au plus ; cuits au bout de 15 min de feu, brûlés au bout de 25
+export const COOK = { done: 15 * MIN, burnt: 25 * MIN, max: 2 };
 const soft = (t, s) => 0.5 + 0.25 * Math.sin(t * 1.7 + s) + 0.15 * Math.sin(t * 3.1 + s * 2.3) + 0.1 * Math.sin(t * 5.3 + s * 0.7);
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -52,6 +55,26 @@ export function createCampfires(scene, { forest, inventory, hands, getAudio, hin
   const audio = () => getAudio?.();
 
   const sites = [];
+  const v3 = new THREE.Vector3();
+  // la broche : deux piquets fourchus de part et d'autre du feu, une traverse
+  const SPIT_Y = 0.62;
+  const spitGeo = mergeColored([
+    ...[-0.55, 0.55].flatMap((x) => [
+      [new THREE.CylinderGeometry(0.018, 0.024, SPIT_Y + 0.08, 5).translate(x, (SPIT_Y + 0.08) / 2 - 0.06, 0), 0x5f4a38],
+      [new THREE.CylinderGeometry(0.01, 0.014, 0.12, 4).rotateZ(0.5).translate(x - 0.03, SPIT_Y + 0.04, 0), 0x5f4a38],
+      [new THREE.CylinderGeometry(0.01, 0.014, 0.12, 4).rotateZ(-0.5).translate(x + 0.03, SPIT_Y + 0.04, 0), 0x5f4a38],
+    ]),
+    [new THREE.CylinderGeometry(0.012, 0.012, 1.25, 5).rotateZ(Math.PI / 2).translate(0, SPIT_Y, 0), 0x7a6450],
+  ]);
+  // la viande change de couleur en cuisant : rose, puis dorée, puis noire
+  const cRaw = new THREE.Color(1, 1, 1), cDone = new THREE.Color(0.62, 0.52, 0.42), cBurnt = new THREE.Color(0.12, 0.1, 0.09);
+  function paintMeat(site) {
+    site.meat?.forEach((mm, i) => {
+      const c = site.spit[i]?.cook || 0;
+      const k1 = Math.min(1, c / COOK.done), k2 = Math.max(0, Math.min(1, (c - COOK.done) / (COOK.burnt - COOK.done)));
+      mm.material.color.copy(cRaw).lerp(cDone, k1).lerp(cBurnt, k2 * k2);
+    });
+  }
   const worldOf = (site, p, out = new THREE.Vector3()) => out.setFromMatrixPosition(p.m).applyAxisAngle(THREE.Object3D.DEFAULT_UP, site.rot).add(v3.set(site.x, site.y, site.z));
   const meshOf = (p, mat) => {
     const m = new THREE.Mesh(itemGeometry(p.type, p.variant), mat);
@@ -154,7 +177,14 @@ export function createCampfires(scene, { forest, inventory, hands, getAudio, hin
     const rem = site.fuelEnd - now;
     return (0.12 + 0.88 * kIgnite(site, now)) * (0.3 + 0.7 * smooth(0, 3 * MIN, rem));
   }
+  function cookTo(site, now) {
+    for (const m of site.spit) {
+      if (site.stage === 'lit') m.cook += Math.max(0, Math.min(now, site.fuelEnd) - Math.max(m.at, site.litAt));
+      m.at = now;
+    }
+  }
   function sync(site, now = Date.now()) {
+    if (site.spit.length) cookTo(site, now);
     if (site.stage === 'lit' && now >= site.fuelEnd) {
       site.stage = 'out'; site.outAt = site.fuelEnd; site.tinder = 0; site.adds = 0;
       rebuild(site);
@@ -168,7 +198,7 @@ export function createCampfires(scene, { forest, inventory, hands, getAudio, hin
   }
   function rebuild(site) {
     const g = site.group;
-    for (const c of [...g.children]) if (c !== site.flames?.g) g.remove(c);
+    for (const c of [...g.children]) if (c !== site.flames?.g) { g.remove(c); if (site.meat?.includes(c)) c.material.dispose(); }
     const now = Date.now();
     site.burnt = site.stage === 'lit' && now - site.litAt > 2 * MIN;
     PIECES.forEach((p, i) => {
@@ -185,12 +215,30 @@ export function createCampfires(scene, { forest, inventory, hands, getAudio, hin
       for (const [x, y, z, s] of ASH) { const m = new THREE.Mesh(ashGeo, ashMat); m.position.set(x, y, z); m.scale.setScalar(s); g.add(m); }
       TINDER.forEach((p, i) => g.add(meshOf(p, i < site.tinder ? itemMaterial : i === site.tinder ? nextMat : ghostMat)));
     }
+    // broche : deux piquets fourchus et une traverse, la viande dessus
+    site.meat = [];
+    if (site.spit.length && site.stage !== 'build') {
+      const sp = new THREE.Mesh(spitGeo, itemMaterial);
+      sp.castShadow = true;
+      g.add(sp);
+      site.spit.forEach((m, i) => {
+        const mm = new THREE.Mesh(itemGeometry('viande'), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, flatShading: true }));
+        mm.position.set(i ? 0.13 : -0.13, SPIT_Y - 0.02, 0);
+        mm.rotation.set(0, Math.PI / 2, 0);
+        mm.scale.setScalar(1.7);
+        mm.castShadow = true;
+        g.add(mm);
+        site.meat.push(mm);
+      });
+      paintMeat(site);
+    }
     if (site.stage === 'lit' && !site.flames) { site.flames = makeFlames(); g.add(site.flames.g); }
     if (site.stage !== 'lit' && site.flames) { g.remove(site.flames.g); site.flames.dispose(); site.flames = null; }
     addCollider(site);
   }
   function addSite(d) {
-    const site = { x: d.x, z: d.z, rot: d.rot || 0, y: forest.groundAt(d.x, d.z) + 0.06, placed: d.placed || 0, stage: d.stage || 'build', fuelEnd: d.fuelEnd || 0, litAt: d.litAt || 0, outAt: d.outAt || 0, tinder: d.tinder || 0, adds: d.adds || 0 };
+    const site = { x: d.x, z: d.z, rot: d.rot || 0, y: forest.groundAt(d.x, d.z) + 0.06, placed: d.placed || 0, stage: d.stage || 'build', fuelEnd: d.fuelEnd || 0, litAt: d.litAt || 0, outAt: d.outAt || 0, tinder: d.tinder || 0, adds: d.adds || 0,
+      spit: Array.isArray(d.spit) ? d.spit.filter((m) => Number.isFinite(m.cook)).slice(0, COOK.max).map((m) => ({ cook: m.cook, at: m.at || Date.now() })) : [] };
     site.group = new THREE.Group();
     site.group.position.set(site.x, site.y, site.z);
     site.group.rotation.y = site.rot;
@@ -266,10 +314,44 @@ export function createCampfires(scene, { forest, inventory, hands, getAudio, hin
     hands.place(worldOf(site, p), p.type, () => { audio()?.place(p.type); after(); rebuild(site); onChange?.(); });
     return true;
   }
+  const spitPos = (site, i) => new THREE.Vector3(i ? 0.13 : -0.13, SPIT_Y, 0).applyAxisAngle(THREE.Object3D.DEFAULT_UP, site.rot).add(v3.set(site.x, site.y, site.z));
   function act(site) {
     if (hands.busy) return;
     const now = Date.now();
     sync(site, now);
+    if (site.stage !== 'build') {
+      // une viande prête (ou carbonisée) : on la retire de la broche
+      const ready = site.spit.findIndex((m) => m.cook >= COOK.done);
+      // la viande crue en main va sur la broche
+      if (inventory.heldType() === 'viande' && site.spit.length < COOK.max && (ready < 0 || site.spit[ready].cook < COOK.burnt)) {
+        const i = site.spit.length;
+        inventory.take('viande');
+        hands.place(spitPos(site, i), 'viande', () => {
+          audio()?.place('viande');
+          site.spit.push({ cook: 0, at: Date.now() });
+          rebuild(site);
+          onChange?.();
+          hint(site.stage === 'lit' ? 'La viande cuit : environ 15 minutes. Attention, au-delà de 25 elle brûle.' : 'La viande attend sur la broche : il faut allumer le feu pour la cuire.', 4000);
+        });
+        return;
+      }
+      if (ready >= 0) {
+        const m = site.spit[ready];
+        if (m.cook >= COOK.burnt) {
+          site.spit.splice(ready, 1); rebuild(site); onChange?.();
+          return hint('La viande a brûlé : elle est perdue.');
+        }
+        if (!inventory.canAdd('viande-cuite')) return hint('Inventaire plein.');
+        hands.pickup(spitPos(site, ready), 'viande-cuite', () => {
+          site.spit.splice(site.spit.indexOf(m), 1);
+          inventory.add('viande-cuite');
+          audio()?.pick('viande');
+          rebuild(site);
+          onChange?.();
+        });
+        return;
+      }
+    }
     if (site.stage === 'build') {
       const p = PIECES[site.placed];
       if (!inventory.count(p.type)) return lack(p.type, PIECES.slice(site.placed).filter((x) => x.type === p.type).length);
@@ -328,13 +410,18 @@ export function createCampfires(scene, { forest, inventory, hands, getAudio, hin
     onChange?.();
   }
   // ce qu'on peut faire avec ce feu, pour l'indice affiché
+  function meatLabel(site) {
+    if (!site.spit.length) return '';
+    const parts = site.spit.map((m) => (m.cook >= COOK.burnt ? 'brûlée' : m.cook >= COOK.done ? 'cuite, à retirer !' : `cuisson ${Math.floor(m.cook / MIN)}/15 min`));
+    return ` · viande : ${parts.join(', ')}`;
+  }
   function label(site) {
     const now = Date.now();
     if (site.stage === 'build') { const p = PIECES[site.placed]; return `Poser ${p.type === 'caillou' ? 'un caillou' : p.type === 'brindille' ? 'une brindille' : 'un bâton'} (${site.placed}/${PIECES.length})`; }
-    if (site.stage === 'built') return 'Allumer avec la pierre à feu';
+    if (site.stage === 'built') return 'Allumer avec la pierre à feu' + meatLabel(site);
     if (site.stage === 'out') return site.tinder < FIRE.tinder ? `Feu éteint : remettre des brindilles (${site.tinder}/${FIRE.tinder})` : 'Rallumer avec la pierre à feu';
     const m = Math.max(0, Math.ceil((site.fuelEnd - now) / MIN));
-    return `Le feu brûle encore ${m} min · touche pour ajouter un bâton`;
+    return `Le feu brûle encore ${m} min · touche pour ajouter un bâton` + meatLabel(site);
   }
 
   // ------------------------------------------------------------------ chaque image
@@ -345,7 +432,7 @@ export function createCampfires(scene, { forest, inventory, hands, getAudio, hin
     const now = Date.now();
     if (preview) updatePreview(player, yaw);
     nextMat.opacity = 0.35 + 0.25 * Math.sin(t * 3.2);
-    out.level = 0; out.hand = 0;
+    out.level = 0; out.hand = 0; out.sizzle = 0;
     for (const s of sites) {
       sync(s, now);
       if (s.stage === 'lit' && !s.burnt && now - s.litAt > 2 * MIN) rebuild(s);
@@ -357,6 +444,7 @@ export function createCampfires(scene, { forest, inventory, hands, getAudio, hin
         const h = k / (1 + d * d * 0.15);
         if (h > out.hand) { out.hand = h; out.dir.set(s.x - player.x, 0.3, s.z - player.z).normalize(); }
       }
+      if (s.spit.length) { paintMeat(s); if (k > 0 && d < 12) out.sizzle = Math.max(out.sizzle, s.spit.length / (1 + d * d * 0.2)); }
       // braises qui s'éteignent doucement après la dernière flamme
       if (s.stage === 'out') s.ember = Math.max(0, 1 - (now - s.outAt) / FIRE.ember);
     }
@@ -392,6 +480,6 @@ export function createCampfires(scene, { forest, inventory, hands, getAudio, hin
     startPlacement, cancelPlacement, confirmPlacement,
     get placing() { return !!preview; }, get placeOk() { return !!preview && preview.ok; },
     sites,
-    data: () => ({ sites: sites.map(({ x, z, rot, placed, stage, fuelEnd, litAt, outAt, tinder, adds }) => ({ x, z, rot, placed, stage, fuelEnd, litAt, outAt, tinder, adds })) }),
+    data: () => ({ sites: sites.map(({ x, z, rot, placed, stage, fuelEnd, litAt, outAt, tinder, adds, spit }) => ({ x, z, rot, placed, stage, fuelEnd, litAt, outAt, tinder, adds, spit: spit.map((m) => ({ cook: Math.round(m.cook), at: m.at })) })) }),
   };
 }

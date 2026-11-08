@@ -3,7 +3,7 @@
 // un objet ramassé repousse ailleurs au bout de 10 à 20 minutes.
 import * as THREE from '../vendor/three.module.min.js';
 import { makeNoise } from './noise.js';
-import { itemGeometry, itemMaterial, matFor } from './models.js';
+import { itemGeometry, itemMaterial, matFor, PERISH } from './models.js';
 
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -17,7 +17,7 @@ const KINDS = {
 };
 const RESPAWN = [10 * 60e3, 20 * 60e3];
 // demi-longueur de chaque objet posé à plat (selon x local) et s'il est fin (posé sur le sol, pas enfoncé)
-const FOOT = { feuille: [0.18, true], fibre: [0.15, true], brindille: [0.17, true], baton: [0.36, true], lance: [0.85, true], couteau: [0.1, true], corde: [0.06, true], carte: [0.09, true], bache: [0.17, true], baies: [0.05, true], bouteille: [0.04, false], sacoche: [0.13, false], caillou: [0.06, false], silex: [0.06, false] };
+const FOOT = { peau: [0.18, true], viande: [0.11, true], 'viande-cuite': [0.11, true], feuille: [0.18, true], fibre: [0.15, true], brindille: [0.17, true], baton: [0.36, true], lance: [0.85, true], couteau: [0.1, true], corde: [0.06, true], carte: [0.09, true], bache: [0.17, true], baies: [0.05, true], bouteille: [0.04, false], sacoche: [0.13, false], caillou: [0.06, false], silex: [0.06, false] };
 
 export function createGroundItems(scene, { forest, saved, onChange }) {
   // hauteur où poser un objet : au-dessus du sol dessiné sur toute sa longueur
@@ -102,7 +102,7 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   // objets jetés par le joueur : restent où ils sont tombés, sans repousse
   const DROP_MAX = 200;
   const droppedMesh = {}, dropped = {};
-  for (const type of ['brindille', 'caillou', 'baton', 'bache', 'bouteille', 'sacoche', 'baies', 'silex', 'feuille', 'fibre', 'corde', 'couteau', 'lance']) {
+  for (const type of ['brindille', 'caillou', 'baton', 'bache', 'bouteille', 'sacoche', 'baies', 'silex', 'feuille', 'fibre', 'corde', 'couteau', 'lance', 'carte', 'peau', 'viande', 'viande-cuite']) {
     dropped[type] = [];
     const m = new THREE.InstancedMesh(itemGeometry(type, type === 'lance' || type === 'couteau' ? 1 : 0), matFor(type), DROP_MAX);
     m.count = 0;
@@ -183,10 +183,16 @@ export function createGroundItems(scene, { forest, saved, onChange }) {
   let timer = 0;
   function update(dt, player) {
     timer -= dt;
-    if (timer > 0 || !pending.length) return;
+    if (timer > 0) return;
     timer = 5;
     const now = Date.now();
     let changed = false;
+    // la viande laissée au sol pourrit aussi
+    for (const type of Object.keys(PERISH)) {
+      const before = dropped[type].length;
+      for (const s of dropped[type].filter((s) => s.extra?.t && now - s.extra.t[0] > PERISH[type])) { s.on = false; gridRemove(s); dropped[type].splice(dropped[type].indexOf(s), 1); }
+      if (dropped[type].length !== before) { refreshDropped(type); changed = true; }
+    }
     pending = pending.filter((p) => {
       if (p.at > now) return true;
       const free = byType[p.type].filter((s) => !s.on && Math.hypot(s.x - player.x, s.z - player.z) > 30);

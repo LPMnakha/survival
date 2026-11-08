@@ -89,7 +89,9 @@ export function createHands({ camera, controls }) {
     else if (type === 'feuille' || type === 'fibre') { arm.item.rotation.set(0, 0, Math.PI / 2 - 0.3); arm.item.position.set(0, 0.04, 0); }
     else if (type === 'corde') { arm.item.position.set(0, -0.02, 0.03); arm.item.rotation.set(Math.PI / 2, 0, 0); }
     else if (type === 'couteau') { arm.item.position.set(0, 0.0, 0.004); arm.item.rotation.set(-0.15, Math.PI / 2, 0); }
-    else if (type === 'lance') { arm.item.position.set(0, -0.62, 0); arm.item.rotation.set(-0.25, 0, -0.12); }
+    else if (type === 'lance') { arm.item.visible = false; } // dessinée à part : voir spearMesh
+    else if (type === 'viande' || type === 'viande-cuite') { arm.item.position.set(0, 0.02, 0.02); arm.item.rotation.set(0, Math.PI / 2, 0.4); }
+    else if (type === 'peau') { arm.item.position.set(0, -0.03, 0.05); arm.item.rotation.set(Math.PI / 2 - 0.3, 0, 0.3); }
     else if (type === 'grattoir') { arm.item.position.set(0.004, 0.012, 0.008); arm.item.rotation.set(0, Math.PI / 2, 0.3); }
   }
 
@@ -506,8 +508,112 @@ export function createHands({ camera, controls }) {
     if (!busy) setItem(R, type);
   }
 
+  // ------------------------------------------------------------------ la lance tenue à deux mains
+  // main droite à l'arrière du manche, main gauche devant, pointe vers l'avant un peu relevée
+  const spearMesh = new THREE.Mesh(itemGeometry('lance'), matFor('lance'));
+  spearMesh.visible = false;
+  root.add(spearMesh);
+  const SPEAR = { g: new THREE.Vector3(0.1, -0.19, -0.37), d: new THREE.Vector3(-0.09, 0.19, -1).normalize(), back: 0.45, front: 0.33 };
+  const LP = { g: SPEAR.g.clone(), d: SPEAR.d.clone(), left: 1, lAway: POSE.lAway.clone() };
+  let spearAnim = false;
+  const yUp = new THREE.Vector3(0, 1, 0), tmpS = new THREE.Vector3();
+  function poseSpear(k, bobV) {
+    // k : 0 = lance baissée hors de vue, 1 = en main
+    tmpS.copy(POSE.away).lerp(LP.g, k).add(bobV);
+    R.pose.p.copy(tmpS);
+    R.pose.tilt = 1.15; R.pose.roll = -0.35;
+    spearMesh.quaternion.setFromUnitVectors(yUp, LP.d);
+    spearMesh.position.copy(tmpS).addScaledVector(LP.d, -SPEAR.back);
+    const front = tmpS.clone().addScaledVector(LP.d, SPEAR.front);
+    L.pose.p.copy(POSE.lAway).lerp(front, Math.min(k, LP.left));
+    L.pose.tilt = 1.2; L.pose.roll = 0.95;
+    L.g.visible = k * LP.left > 0.02;
+    spearMesh.visible = k > 0.02;
+  }
+  const spearTipWorld = () => { root.updateMatrixWorld(true); return spearMesh.localToWorld(new THREE.Vector3(0, 1.72, 0)); };
+
+  // coup d'estoc : on recule un peu, on pique vers l'avant, on revient
+  async function thrust(onHit) {
+    if (busy || heldType !== 'lance') return;
+    busy = true; spearAnim = true;
+    const g0 = SPEAR.g.clone();
+    await tween(0.13, (k) => LP.g.copy(g0).addScaledVector(LP.d, -0.09 * ease(k)));
+    await tween(0.13, (k) => LP.g.copy(g0).addScaledVector(LP.d, -0.09 + 0.47 * easeOut(k)));
+    onHit?.();
+    await tween(0.09, () => {});
+    await tween(0.32, (k) => LP.g.copy(g0).addScaledVector(LP.d, 0.38 * (1 - ease(k))));
+    LP.g.copy(g0);
+    spearAnim = false; busy = false;
+  }
+  // lancer comme un javelot : la gauche lâche, la droite ramène la lance au-dessus de l'épaule, puis la projette
+  async function throwSpear(onRelease) {
+    if (busy || heldType !== 'lance') return;
+    busy = true; spearAnim = true;
+    const g0 = SPEAR.g.clone(), d0 = SPEAR.d.clone();
+    const gUp = new THREE.Vector3(0.24, -0.02, -0.26), dUp = new THREE.Vector3(-0.16, 0.2, -1).normalize();
+    await tween(0.42, (k) => { const e = ease(k); LP.left = 1 - e; LP.g.lerpVectors(g0, gUp, e); LP.d.copy(d0).lerp(dUp, e).normalize(); });
+    await tween(0.2, (k) => LP.g.copy(gUp).add(tmpS.set(0.01, 0.01, 0.06 * ease(k)))); // on arme le bras
+    const gArmed = LP.g.clone(), gOut = new THREE.Vector3(0.05, -0.08, -0.6);
+    let released = false;
+    await tween(0.15, (k) => {
+      LP.g.lerpVectors(gArmed, gOut, k * k);
+      if (!released && k >= 0.5) {
+        released = true;
+        const tip = spearTipWorld();
+        camera.updateMatrixWorld();
+        const fwd = new THREE.Vector3(0, 0.07, -1).normalize().applyQuaternion(camera.quaternion);
+        spearHidden = true;
+        onRelease?.(tip, fwd);
+      }
+      if (released) { R.pose.p.copy(LP.g); spearMesh.visible = false; }
+    });
+    // le bras accompagne le geste puis redescend
+    spearAnim = false;
+    const a = R.pose.p.clone();
+    await tween(0.18, (k) => R.pose.p.lerpVectors(a, gOut.clone().add(tmpS.set(0.02, -0.06, 0.02)), easeOut(k)));
+    const b = R.pose.p.clone();
+    await tween(0.35, (k) => R.pose.p.lerpVectors(b, POSE.away, ease(k)));
+    LP.g.copy(g0); LP.d.copy(d0); LP.left = 1;
+    spearHidden = false;
+    busy = false;
+    restore();
+  }
+  let spearHidden = false;
+
+  // dépecer : accroupi, la gauche maintient le lapin, la droite incise au couteau, puis on tire la peau
+  async function skin(target, onDone) {
+    setItem(R, 'couteau');
+    R.g.visible = true;
+    R.pose.roll = 0; R.pose.tilt = 0;
+    const ctx = await begin(target, { crouch: 0.85, approach: 0.6 });
+    setItem(L, null);
+    L.g.visible = true;
+    L.pose.p.copy(POSE.lAway); L.pose.roll = 1.3; L.pose.tilt = 0.5;
+    const body = reachTo(target, 0.7);
+    await Promise.all([moveTo(L, body.clone().add(V(-0.05, 0.03, 0)), 0.45), moveTo(R, body.clone().add(V(0.07, 0.06, 0.02)), 0.45, ease, 0.9, -1.2)]);
+    for (let i = 0; i < 2; i++) { // deux incisions le long du ventre
+      await moveTo(R, body.clone().add(V(-0.02, 0.025, 0.04)), 0.32);
+      onTick?.('skin');
+      await moveTo(R, body.clone().add(V(0.07, 0.06, 0.02)), 0.25);
+    }
+    // on tire la peau : les mains s'écartent
+    setItem(R, null);
+    await Promise.all([moveTo(L, body.clone().add(V(-0.12, 0.1, 0.03)), 0.5, ease, 0.8), moveTo(R, body.clone().add(V(0.12, 0.1, 0.03)), 0.5, ease, 0.8)]);
+    onTick?.('skin');
+    onDone?.();
+    setItem(L, 'peau');
+    const endP = end(ctx, 0.55);
+    await Promise.all([moveTo(L, V(-0.1, -0.13, -0.36), 0.45), moveTo(R, POSE.away, 0.45)]);
+    await tween(0.3, () => {});
+    await moveTo(L, POSE.lAway, 0.4);
+    L.g.visible = false;
+    setItem(L, null);
+    await endP;
+    restore();
+  }
+
   // ------------------------------------------------------------------ chaque image
-  let phase = 0;
+  let phase = 0, wasSpear = false;
   const bob = new THREE.Vector3();
   function update(dt, light) {
     root.position.copy(camera.position);
@@ -521,17 +627,28 @@ export function createHands({ camera, controls }) {
     // la main reste dans le cadre, en portrait comme en paysage
     const halfH = Math.tan((camera.fov * Math.PI) / 360), halfW = halfH * camera.aspect;
     POSE.rest.set(Math.min(0.15, halfW * 0.42 * 0.6), -Math.min(0.19, halfH * 0.42 * 0.52), -0.42);
-    if (!busy) {
+    const spearMode = heldType === 'lance' && (!busy || spearAnim) && !spearHidden;
+    if (!busy || spearAnim) {
       // main levée quand on tient quelque chose, baissée sinon ; balancement de la marche
       shown += ((heldType ? 1 : 0) - shown) * (1 - Math.exp(-dt * 8));
       const speed = Math.hypot(st.vel.x, st.vel.z);
       phase += dt * speed * 5.2;
       bob.set(Math.cos(phase * 0.5) * 0.008, -Math.abs(Math.sin(phase * 0.5)) * 0.012, 0).multiplyScalar(Math.min(1, speed / 1.5));
-      R.pose.p.lerpVectors(POSE.away, POSE.rest, ease(Math.min(1, Math.max(0, shown)))).add(bob);
-      // poignet plié vers l'avant : l'objet tenu reste droit malgré l'avant-bras qui monte
-      R.pose.tilt = REST.tilt; R.pose.roll = REST.roll;
-      R.g.visible = shown > 0.02 || !!heldType;
+      if (spearMode) {
+        poseSpear(ease(Math.min(1, Math.max(0, shown))), bob);
+        R.g.visible = true;
+      } else if (!busy) {
+        R.pose.p.lerpVectors(POSE.away, POSE.rest, ease(Math.min(1, Math.max(0, shown)))).add(bob);
+        // poignet plié vers l'avant : l'objet tenu reste droit malgré l'avant-bras qui monte
+        R.pose.tilt = REST.tilt; R.pose.roll = REST.roll;
+        R.g.visible = shown > 0.02 || !!heldType;
+      }
     }
+    if (!spearMode && !spearAnim) {
+      spearMesh.visible = false;
+      if (wasSpear) { L.g.visible = false; L.pose.p.copy(POSE.lAway); }
+    }
+    wasSpear = spearMode;
     placeArm(R, SHOULDER.r);
     placeArm(L, SHOULDER.l);
     updateFlakes(dt);
@@ -550,12 +667,12 @@ export function createHands({ camera, controls }) {
     }
   }
   function render(renderer) {
-    if (!R.g.visible && !L.g.visible && !prop.visible) return;
+    if (!R.g.visible && !L.g.visible && !prop.visible && !spearMesh.visible) return;
     // (r169 n'efface la profondeur que si l'écriture est permise : le dernier objet dessiné peut l'avoir coupée)
     renderer.state.buffers.depth.setMask(true);
     renderer.clearDepth();
     renderer.render(scene, camera);
   }
 
-  return { update, render, pickup, place, strike, fill, consume, cut, craft, setTick(fn) { onTick = fn; }, setHeld, get busy() { return busy; }, _arms: { R, L, root, scene, STRIKE, REST, BATON, CONSUME, setItem } };
+  return { update, render, pickup, place, strike, fill, consume, cut, craft, thrust, throwSpear, skin, setTick(fn) { onTick = fn; }, setHeld, get busy() { return busy; }, _arms: { R, L, root, scene, STRIKE, REST, BATON, CONSUME, SPEAR, LP, spearMesh, setItem } };
 }

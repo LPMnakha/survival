@@ -30,6 +30,11 @@
 
   <div id="hint-pill" aria-live="polite"></div>
   <div id="actions"></div>
+  <div id="aim" aria-hidden="true"></div>
+  <div id="combat" aria-label="Lance">
+    <button id="btn-throw" aria-label="Lancer la lance"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 20 18 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M21 3l-5.5 1.5 4 4z" fill="currentColor"/><path d="M5 12c1-3 3-5 6-6M9 17c1-2 2-3 4-4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity=".6"/></svg><span>Lancer</span></button>
+    <button id="btn-attack" aria-label="Attaquer"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M3 21 16 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M21 3l-6.5 2 4.5 4.5z" fill="currentColor"/><path d="M12 6l6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity=".5"/></svg><span>Attaquer</span></button>
+  </div>
 
   <div id="hud" hidden>
     <button id="btn-inv" class="hud-icon" aria-label="Inventaire">
@@ -115,6 +120,8 @@
       <button id="enter">Entrer</button>
       <p id="hint"></p>
       <p id="meteo"></p>
+      <p class="reset-line"><button id="btn-reset" class="reset-btn">Recommencer une partie</button></p>
+      <p class="reset-confirm" id="reset-confirm" hidden>Tout effacer et repartir de zéro ? <button id="btn-reset-yes" class="reset-btn danger">Oui, tout effacer</button> <button id="btn-reset-no" class="reset-btn">Non</button></p>
     </div>
   </div>
 

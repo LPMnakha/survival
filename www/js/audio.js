@@ -201,6 +201,24 @@ export function createForestAudio() {
       burst(at + 0.02, 0.05, 'bandpass', 1800, 2, 0.03);
     }
   }
+  // souffle d'un geste rapide (estoc, lancer)
+  function swish(t, f0, f1, dur, vol) {
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.4;
+    f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.35); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f).connect(g).connect(master); s.start(t, Math.random() * 2); s.stop(t + dur + 0.02);
+  }
+  // impacts, assourdis : dans un lapin, dans le bois, dans la terre
+  function thud(kind, t) {
+    if (kind === 'bois') { knock(t, 320, 180, 0.12, 0.09); burst(t, 0.06, 'bandpass', 1400, 2, 0.05); }
+    else if (kind === 'sol') { knock(t, 110, 60, 0.14, 0.08); burst(t, 0.12, 'lowpass', 500, 0.7, 0.07); }
+    else { knock(t, 150, 80, 0.1, 0.06); burst(t, 0.08, 'lowpass', 700, 0.8, 0.05); }
+  }
+  // grésillement de la viande sur la broche (bruit filtré, en continu)
+  const sizzleHp = ctx.createBiquadFilter(); sizzleHp.type = 'highpass'; sizzleHp.frequency.value = 3200;
+  const sizzleGain = ctx.createGain(); sizzleGain.gain.value = 0;
+  loop(1.7, 0.6).connect(sizzleHp).connect(sizzleGain).connect(master);
   // croquer des baies
   function crunch(t) { for (let i = 0; i < 3; i++) { burst(t + i * 0.12, 0.05, 'bandpass', 1500 + Math.random() * 800, 1.5, 0.04); knock(t + i * 0.12, 300, 180, 0.05, 0.025); } }
   function scrape(t) {
@@ -265,7 +283,11 @@ export function createForestAudio() {
     pour() { pourSound(ctx.currentTime); },
     drink() { gulps(ctx.currentTime + 0.05); },
     eat() { crunch(ctx.currentTime + 0.02); },
-    tick(kind) { const t = ctx.currentTime + 0.005; if (kind === 'knap') knap(t); else twist(t); },
+    tick(kind) { const t = ctx.currentTime + 0.005; if (kind === 'knap') knap(t); else if (kind === 'skin') { burst(t, 0.18, 'bandpass', 900, 1, 0.04); burst(t + 0.05, 0.12, 'highpass', 2500, 0.8, 0.02); } else twist(t); },
+    thrust() { swish(ctx.currentTime + 0.13, 500, 1400, 0.22, 0.05); },
+    whoosh() { swish(ctx.currentTime, 700, 260, 0.6, 0.06); },
+    impact(kind) { thud(kind, ctx.currentTime + 0.005); },
+    setSizzle(level) { sizzleGain.gain.setTargetAtTime(Math.min(0.06, level * 0.05), ctx.currentTime, 0.6); },
     cut() { /* le bruit des coups est joué pendant le geste */ },
     cutStart() { slice(ctx.currentTime); },
     crafted(type) { handle(type === 'couteau' ? 'caillou' : 'brindille', ctx.currentTime + 0.01); },

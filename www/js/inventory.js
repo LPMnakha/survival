@@ -3,7 +3,7 @@
 // plusieurs cases. Toucher une case d'accès rapide met l'objet en main (ou le
 // range) ; dans l'inventaire complet, toucher une case puis une autre les échange.
 // Équipement : tête, haut, bas, chaussures, sac (la sacoche va dans la case sac).
-import { ITEMS, ICONS, itemName, anItem, bottleIcon, fmtWater, EQUIP_SLOTS } from './models.js';
+import { ITEMS, ICONS, itemName, anItem, bottleIcon, fmtWater, EQUIP_SLOTS, PERISH } from './models.js';
 
 export const MAX = 8, BASE = 5, QUICK = 3;
 
@@ -11,7 +11,15 @@ export function createInventory({ saved, onChange }) {
   let slots = [{ type: 'pierre-a-feu', n: 1 }, null, null, null, null, null, null, null];
   let held = -1;
   const equip = { tete: null, haut: null, bas: null, chaussures: null, sac: null };
-  const clean = (s) => (s && ITEMS[s.type] && s.n > 0 ? { type: s.type, n: Math.min(s.n, ITEMS[s.type].stack), ...(s.type === 'bouteille' ? { w: Math.max(0, Math.min(1000, s.w || 0)) } : {}) } : null);
+  // les denrées périssables gardent la date de chaque morceau (le plus ancien d'abord)
+  const dates = (s) => { const t = Array.isArray(s.t) ? s.t.filter(Number.isFinite).slice(0, s.n) : []; while (t.length < s.n) t.push(Date.now()); return t.sort((a, b) => a - b); };
+  const clean = (s) => {
+    if (!(s && ITEMS[s.type] && s.n > 0)) return null;
+    const out = { type: s.type, n: Math.min(s.n, ITEMS[s.type].stack) };
+    if (s.type === 'bouteille') out.w = Math.max(0, Math.min(1000, s.w || 0));
+    if (PERISH[s.type]) out.t = dates({ ...s, n: out.n });
+    return out;
+  };
   if (saved && Array.isArray(saved.slots)) {
     slots = Array.from({ length: MAX }, (_, i) => clean(saved.slots[i]));
     held = Number.isInteger(saved.held) && saved.held < QUICK ? saved.held : -1;
@@ -28,7 +36,8 @@ export function createInventory({ saved, onChange }) {
     if (ITEMS[type].stack > 1) i = slots.findIndex((s, k) => k < cap() && s && s.type === type && s.n < ITEMS[type].stack);
     if (i < 0) i = slots.findIndex((s, k) => k < cap() && !s);
     if (i < 0) return false;
-    if (slots[i]) slots[i].n++; else slots[i] = { type, n: 1, ...(type === 'bouteille' ? { w: extra.w || 0 } : {}) };
+    if (slots[i]) slots[i].n++; else slots[i] = { type, n: 1, ...(type === 'bouteille' ? { w: extra.w || 0 } : {}), ...(PERISH[type] ? { t: [] } : {}) };
+    if (PERISH[type]) { slots[i].t.push(extra.t && Number.isFinite(extra.t[0]) ? extra.t[0] : Date.now()); slots[i].t.sort((a, b) => a - b); }
     changed();
     return true;
   }
@@ -42,6 +51,7 @@ export function createInventory({ saved, onChange }) {
       if (score(i, s) < score(best, slots[best])) best = i;
     });
     if (best < 0) return false;
+    slots[best].t?.shift(); // le morceau le plus ancien part en premier
     if (--slots[best].n <= 0) { slots[best] = null; if (held === best) held = -1; }
     changed();
     return true;
@@ -50,10 +60,21 @@ export function createInventory({ saved, onChange }) {
   function takeAt(i) {
     const s = slots[i];
     if (!s) return null;
-    const out = { type: s.type, extra: s.type === 'bouteille' ? { w: s.w || 0 } : undefined };
+    const out = { type: s.type, extra: s.type === 'bouteille' ? { w: s.w || 0 } : s.t ? { t: [s.t.shift()] } : undefined };
     if (--s.n <= 0) { slots[i] = null; if (held === i) held = -1; }
     changed();
     return out;
+  }
+  // ce qui a pourri disparaît ; rend la liste des types perdus
+  function spoil(now = Date.now()) {
+    const lost = [];
+    slots.forEach((s, i) => {
+      if (!s || !PERISH[s.type]) return;
+      while (s.t.length && now - s.t[0] > PERISH[s.type]) { s.t.shift(); s.n--; lost.push(s.type); }
+      if (s.n <= 0) { slots[i] = null; if (held === i) held = -1; }
+    });
+    if (lost.length) changed();
+    return lost;
   }
   const heldType = () => (held >= 0 && slots[held] ? slots[held].type : null);
   const heldSlot = () => (held >= 0 ? slots[held] : null);
@@ -208,7 +229,7 @@ export function createInventory({ saved, onChange }) {
   render();
 
   return {
-    count, canAdd, add, take, takeAt, heldType, heldSlot, toggleHeld, swap, open, openEquip, render, equipFrom, unequip,
+    count, canAdd, add, take, takeAt, spoil, heldType, heldSlot, toggleHeld, swap, open, openEquip, render, equipFrom, unequip,
     setDrop(fn) { onDrop = fn; },
     setEquipMessage(fn) { onEquip = fn; },
     setRead(fn) { onRead = fn; },

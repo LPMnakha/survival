@@ -13,12 +13,16 @@ Une forêt 3D à la première personne où il faut survivre : boire, manger, fai
 - **Sommeil** (jauge lune) : il baisse en temps réel quand on est éveillé (2 jours pour le vider). On ne dort que dans l'**abri de fortune** : touche-le pour t'y allonger, puis tu peux fermer l'appli, tu dors jusqu'à ton retour (8 h remplissent la jauge). Sous 25 %, on avance moins vite ; à 0, on s'endort sur place (deux fois moins réparateur, on peut se lever à partir de 30 %).
 - **Soif et faim** (jauges en haut à gauche), en temps réel, **même appli fermée** : 3 jours sans boire ou 14 jours sans manger, et c'est la fin. **Pas de deuxième chance** : la partie s'arrête, il faut en recommencer une.
 - **Boire** : il faut 1 L par jour. La bouteille (1 L) se remplit au récupérateur d'eau de pluie ; « Boire » prend 25 cl (environ 8 % de la jauge). L'eau du ruisseau n'est pas potable.
-- **Manger** : les baies des buissons (5 poignées par buisson, elles repoussent en une semaine, peu de buissons garnis en hiver). « Manger » une poignée remonte la faim de 3 %.
+- **Manger** : les baies des buissons (5 poignées par buisson, elles repoussent en une semaine, peu de buissons garnis en hiver) remontent la faim de 1 % par poignée ; un morceau de viande de lapin cuite, de 10 %.
+- **Chasse** : lance en main, deux boutons en bas à droite. « Attaquer » donne un coup d'estoc (portée 2 m). « Lancer » la projette comme un javelot vers le point de visée : elle se plante dans un lapin, un arbre ou le sol, et il faut aller la ramasser. Les **lapins** se figent quand on approche, puis détalent en zigzag, trois fois plus vite que nous.
+- **Lapin mort** : touche-le pour récupérer la lance plantée dedans, puis, couteau artisanal en main, pour le **dépecer** (1 peau, 2 viandes crues). Laissé 2 jours, il pourrit. Un autre lapin apparaît ailleurs un jour après.
+- **Cuisson** : viande crue en main, touche un feu de camp : elle va sur une broche (2 morceaux). Cuite au bout de 15 min de feu, brûlée au bout de 25 (même appli fermée). Touche le feu pour la retirer.
+- **La viande se gâte** : crue en 2 jours, cuite en 4 jours.
 - **Lieux abandonnés** à fouiller (le butin ne se trouve qu'une fois par partie) : une vieille cabane en rondins (bâche, bouteille), un campement abandonné (sacoche) et un mirador de chasse (la carte, dans une boîte clouée à un poteau).
 - **Carte** : touche-la dans l'inventaire pour l'ouvrir. On y écrit au doigt au crayon, la gomme efface ; les notes sont gardées.
 - **Silex** : rares, surtout dans le lit du ruisseau.
 - **Plantes** : couteau artisanal en main, touche une fougère (2 feuilles), des orties ou des joncs (1 fibre). Elles repoussent en 3 jours.
-- **Fabriquer** a deux onglets. **Outils** (faits dans les mains) : couteau artisanal (2 silex), corde (2 fibres), lance (1 bâton, 1 corde, 1 couteau artisanal, dont la lame est ligaturée au bout). **Structures** (posées au sol pièce par pièce) : petit feu de camp, récupérateur d'eau de pluie, abri de fortune (6 bâtons, 4 cordes, 20 feuilles, 4 cailloux).
+- **Fabriquer** a deux onglets. **Outils** (faits dans les mains) : couteau artisanal (2 silex), corde (2 fibres), lance (1 bâton, 1 corde, 1 couteau artisanal, dont la lame est ligaturée au bout). **Structures** (posées au sol pièce par pièce) : petit feu de camp, récupérateur d'eau de pluie, abri de fortune (6 bâtons, 4 cordes, 20 feuilles, 4 cailloux, 2 peaux de lapin en matelas).
 - **Équipement** (icône t-shirt) : tête, haut, bas, chaussures, sac. La sacoche se met dans la case sac et ajoute 3 cases à l'inventaire.
 - **Récupérateur d'eau de pluie** (Fabriquer) : 1 bâche, 4 bâtons, 4 cailloux. Il recueille la pluie réelle d'Annecy (1 mm = 1 L), même appli fermée, jusqu'à 10 L.
 
@@ -33,6 +37,8 @@ Une forêt 3D à la première personne où il faut survivre : boire, manger, fai
 - **Sauvegarde** sur l'appareil : position, inventaire, équipement, objets ramassés et posés, feux, récupérateurs, abris, plantes coupées, notes sur la carte, jauges. Le feu brûle et la pluie tombe appli fermée.
 
 ## Jouer
+
+- **Recommencer une partie** : lien en bas de l'écran d'accueil (avec confirmation).
 
 - **iPhone / navigateur** : https://lpmnakha.github.io/survival/
   (sur iPhone : Partager → « Sur l'écran d'accueil » pour l'ouvrir en plein écran)

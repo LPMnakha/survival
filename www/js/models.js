@@ -19,9 +19,14 @@ export const ITEMS = {
   couteau: { one: 'couteau artisanal', many: 'couteaux artisanaux', stack: 1 },
   lance: { one: 'lance', many: 'lances', stack: 1 },
   carte: { one: 'carte', many: 'cartes', stack: 1 },
+  peau: { one: 'peau de lapin', many: 'peaux de lapin', stack: 10 },
+  viande: { one: 'viande crue', many: 'viandes crues', stack: 10 },
+  'viande-cuite': { one: 'viande cuite', many: 'viandes cuites', stack: 10 },
 };
+// ce qui se gâte (temps réel)
+export const PERISH = { viande: 2 * 864e5, 'viande-cuite': 4 * 864e5 };
 // « un caillou », « une bâche »…
-const FEM = new Set(['brindille', 'pierre-a-feu', 'bache', 'bouteille', 'sacoche', 'baies', 'feuille', 'fibre', 'corde', 'lance', 'carte']);
+const FEM = new Set(['brindille', 'pierre-a-feu', 'bache', 'bouteille', 'sacoche', 'baies', 'feuille', 'fibre', 'corde', 'lance', 'carte', 'peau', 'viande', 'viande-cuite']);
 export const anItem = (type) => (FEM.has(type) ? 'une ' : 'un ') + ITEMS[type].one;
 export const theItem = (type) => (FEM.has(type) ? 'cette ' : type === 'baies' ? 'ces ' : 'ce ') + ITEMS[type].one;
 export const itemName = (type, n = 1) => (n > 1 ? ITEMS[type].many : ITEMS[type].one);
@@ -169,6 +174,27 @@ export function itemGeometry(type, variant = 0) {
     for (let k = 0; k < 4; k++) parts.push([new THREE.BoxGeometry(0.03 + (k % 2) * 0.02, 0.0012, 0.003).translate(-0.04 + k * 0.028, 0.0068, -0.03 + (k % 3) * 0.025), 0x6a5038]);
     parts.push([new THREE.BoxGeometry(0.004, 0.0012, 0.09).rotateY(0.4).translate(0.01, 0.0068, 0.005), 0x3d6b86]);
     g = mergeColored(parts);
+  } else if (type === 'viande' || type === 'viande-cuite') {
+    // un morceau de lapin (cuisse) : chair, gras, bout d'os
+    const raw = type === 'viande';
+    const body = new THREE.IcosahedronGeometry(0.045, 1).scale(1.5, 0.6, 1);
+    const p = body.attributes.position;
+    for (let i = 0; i < p.count; i++) p.setX(i, p.getX(i) * (1 + 0.25 * Math.max(0, p.getX(i)) / 0.07));
+    body.computeVertexNormals();
+    body.translate(0, 0.026, 0);
+    const fat = new THREE.IcosahedronGeometry(0.02, 0).scale(1.6, 0.4, 1).translate(0.02, 0.045, 0.01);
+    const bone = new THREE.CylinderGeometry(0.007, 0.009, 0.05, 5).rotateZ(Math.PI / 2).translate(-0.085, 0.024, 0);
+    const knob = new THREE.IcosahedronGeometry(0.011, 0).translate(-0.11, 0.024, 0);
+    g = mergeColored([[body, raw ? 0xc4544f : 0x8a4f2a], [fat, raw ? 0xf0d9cc : 0xc89a5e], [bone, 0xe9e2d0], [knob, 0xe9e2d0]]);
+  } else if (type === 'peau') {
+    // peau de lapin étalée : fourrure gris-brun, ventre clair, contour irrégulier
+    const shape = new THREE.Shape();
+    const pts = [[-0.17, 0], [-0.14, 0.08], [-0.05, 0.11], [0.06, 0.1], [0.15, 0.07], [0.19, 0.01], [0.15, -0.06], [0.05, -0.1], [-0.06, -0.11], [-0.15, -0.07]];
+    shape.moveTo(...pts[0]);
+    for (const q of pts.slice(1)) shape.lineTo(...q);
+    const hide = new THREE.ExtrudeGeometry(shape, { depth: 0.012, bevelEnabled: false }).rotateX(-Math.PI / 2);
+    const belly = new THREE.CircleGeometry(0.06, 7).scale(1.4, 1, 1).rotateX(-Math.PI / 2).translate(0, 0.0125, 0);
+    g = mergeColored([[hide, 0x8a7a66], [belly, 0xc9bca4]]);
   } else if (type === 'grattoir') {
     const plate = new THREE.BoxGeometry(0.06, 0.03, 0.004);
     const edge = new THREE.BoxGeometry(0.06, 0.005, 0.0045).translate(0, 0.015, 0);
@@ -198,6 +224,9 @@ export const ICONS = {
   fibre: '<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke-linecap="round" stroke-width="1.4"><path d="M4 20c8-3 16-5 24-9" stroke="#b9b07a"/><path d="M4 22c8-2 16-5 24-8" stroke="#a59c66"/><path d="M5 24c8-3 15-6 23-10" stroke="#c6be8a"/></g><path d="M14.5 15.5l2.5 6" stroke="#7f774c" stroke-width="2.4" stroke-linecap="round"/></svg>',
   corde: '<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke-width="2.6"><circle cx="16" cy="16" r="10" stroke="#b59e70"/><circle cx="16" cy="16" r="6.2" stroke="#a48d62"/><circle cx="16" cy="16" r="2.6" stroke="#b59e70"/></g><path d="M25 19c2 1 3 3 3.5 6" fill="none" stroke="#a48d62" stroke-width="2.4" stroke-linecap="round"/></svg>',
   carte: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 8l8-3 8 3 8-3v19l-8 3-8-3-8 3z" fill="#e6d8b6"/><path d="M12 5v19M20 8v19" stroke="#bfae86" stroke-width="1"/><path d="M6 14c3-2 5 1 8-1s5-3 8-1 3 1 4 0" fill="none" stroke="#3d6b86" stroke-width="1.4" stroke-linecap="round"/><path d="M15 19l2 2m0-2-2 2" stroke="#8a3a2a" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  viande: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 11c4-5 13-6 17 0s1 13-6 13S3 16 7 11z" fill="#c4544f"/><path d="M11 10c3-2 8-2 11 1" fill="none" stroke="#f0d9cc" stroke-width="2" stroke-linecap="round"/><path d="M20 22l5 5" stroke="#e9e2d0" stroke-width="3" stroke-linecap="round"/><circle cx="26.5" cy="28" r="2" fill="#e9e2d0"/></svg>',
+  'viande-cuite': '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 11c4-5 13-6 17 0s1 13-6 13S3 16 7 11z" fill="#8a4f2a"/><path d="M11 10c3-2 8-2 11 1" fill="none" stroke="#c89a5e" stroke-width="2" stroke-linecap="round"/><path d="M10 15l3 2M15 13l3 2M13 19l3 2" stroke="#5e3218" stroke-width="1.3" stroke-linecap="round"/><path d="M20 22l5 5" stroke="#e9e2d0" stroke-width="3" stroke-linecap="round"/><circle cx="26.5" cy="28" r="2" fill="#e9e2d0"/></svg>',
+  peau: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 16l3-6 8-2 9 1 5 5-2 7-8 4-9-1-5-4z" fill="#8a7a66"/><ellipse cx="16" cy="16" rx="6" ry="4" fill="#c9bca4"/><path d="M8 12l2 1M22 11l-1 2M9 21l2-1" stroke="#6e604e" stroke-width="1.2" stroke-linecap="round"/></svg>',
   'pierre-a-feu': '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="13" y="16" width="6.5" height="12" rx="2.5" fill="#9a6a42"/><rect x="14.6" y="3.5" width="3.3" height="13" rx="1.2" fill="#55575e"/><g fill="#f0b46a"><circle cx="23" cy="6" r="1.1"/><circle cx="25.5" cy="10" r="0.8"/><circle cx="22" cy="11" r="0.7"/></g></svg>',
 };
 

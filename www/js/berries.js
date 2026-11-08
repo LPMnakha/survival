@@ -23,7 +23,7 @@ export function createBerries(scene, { forest, season, saved, onChange }) {
     // en hiver, seul un buisson sur trois porte encore des baies
     const bare = season.name === 'hiver' ? R() > 0.33 : season.name === 'printemps' ? R() > 0.7 : false;
     bushes.push({ id, x, z, y: forest.groundAt(x, z), s, rot: R() * 6.28, bare, picks: [] });
-    forest.addCollider({ x0: x - 0.32 * s, x1: x + 0.32 * s, z0: z - 0.32 * s, z1: z + 0.32 * s });
+    forest.addCollider({ x0: x - 0.32 * s, x1: x + 0.32 * s, z0: z - 0.32 * s, z1: z + 0.32 * s, low: true });
     return true;
   };
   for (const [x, z] of near) tryAdd(x, z);

@@ -235,3 +235,35 @@ canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block;
 }
 .map-tools button.on { background: rgba(233, 160, 97, 0.32); border-color: rgba(233, 160, 97, 0.6); }
 #map:not(.on) { pointer-events: none; }
+
+/* lance : Attaquer et Lancer, en bas à droite */
+#combat {
+  position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(86px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity 0.35s ease, transform 0.35s ease;
+}
+#combat.on { opacity: 1; pointer-events: auto; transform: none; }
+#combat button {
+  appearance: none; display: grid; place-items: center; gap: 1px; cursor: pointer; color: var(--ink); font: inherit;
+  border-radius: 50%; border: 1px solid rgba(244, 233, 218, 0.28); background: rgba(20, 13, 9, 0.45);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); transition: background 0.2s ease, transform 0.15s ease;
+}
+#combat button span { font-size: 10.5px; color: var(--ink-soft); line-height: 1; }
+#combat button:active { transform: scale(0.94); }
+#btn-attack { width: 74px; height: 74px; background: rgba(233, 160, 97, 0.28); border-color: rgba(233, 160, 97, 0.6); }
+#btn-throw { width: 58px; height: 58px; }
+#combat button:disabled { opacity: 0.45; }
+
+/* recommencer une partie (écran d'accueil) */
+.reset-line, .reset-confirm { margin: 18px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.8; }
+.reset-btn { appearance: none; border: 0; background: none; font: inherit; font-size: 13px; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 4px 6px; }
+.reset-btn.danger { color: #e8a08a; }
+.reset-confirm[hidden], .reset-line[hidden] { display: none; }
+
+/* point de visée (lance en main) */
+#aim {
+  position: fixed; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+  border: 1.5px solid rgba(244, 233, 218, 0.55); pointer-events: none; opacity: 0; transition: opacity 0.3s ease;
+}
+#aim::after { content: ''; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: rgba(244, 233, 218, 0.85); }
+#aim.on { opacity: 1; }

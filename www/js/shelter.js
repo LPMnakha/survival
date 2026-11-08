@@ -1,12 +1,12 @@
 // Abri de fortune : un appentis. Deux poteaux, une poutre faîtière ligaturée,
-// trois chevrons qui descendent jusqu'au sol, une couverture de feuilles, et des
-// cailloux pour caler le pied des chevrons. On le monte pièce par pièce
-// (6 bâtons, 4 cordes, 20 feuilles, 4 cailloux). C'est le seul endroit où l'on dort.
+// trois chevrons qui descendent jusqu'au sol, une couverture de feuilles, des
+// cailloux pour caler le pied des chevrons et deux peaux de lapin en matelas.
+// On le monte pièce par pièce (6 bâtons, 4 cordes, 20 feuilles, 4 cailloux, 2 peaux). C'est le seul endroit où l'on dort.
 import * as THREE from '../vendor/three.module.min.js';
 import { itemGeometry, itemMaterial, anItem } from './models.js';
 import { mergeColored } from './builder.js';
 
-export const RECIPE3 = { name: 'Abri de fortune', needs: { baton: 6, corde: 4, feuille: 20, caillou: 4 } };
+export const RECIPE3 = { name: 'Abri de fortune', needs: { baton: 6, corde: 4, feuille: 20, caillou: 4, peau: 2 } };
 
 const RIDGE = 1.05, BACK = -1.55, HALF = 1.05;
 const X = new THREE.Vector3(1, 0, 0);
@@ -41,6 +41,9 @@ for (let row = 0; row < 4; row++) for (let col = 0; col < 5; col++) {
   PIECES.push({ type: 'feuille', m });
 }
 for (const x of [-0.84, -0.28, 0.28, 0.84]) PIECES.push({ type: 'caillou', variant: Math.abs(Math.round(x * 3)) % 3, m: new THREE.Matrix4().compose(V(x, 0, BACK - 0.12), new THREE.Quaternion().setFromAxisAngle(THREE.Object3D.DEFAULT_UP, x * 4), new THREE.Vector3(1.4, 1.4, 1.4)) });
+
+// deux peaux de lapin étalées au sol sous le toit : le matelas
+for (const [x, r] of [[-0.18, 0.25], [0.34, -0.2]]) PIECES.push({ type: 'peau', m: new THREE.Matrix4().compose(V(x, 0.01, -0.72), new THREE.Quaternion().setFromAxisAngle(THREE.Object3D.DEFAULT_UP, Math.PI / 2 + r), new THREE.Vector3(1.6, 1, 1.9)) });
 
 // où l'on s'allonge : sous le toit, la tête vers le fond, les yeux vers l'ouverture
 export const BED = { x: 0.1, y: 0.28, z: -0.75 };
@@ -151,7 +154,7 @@ export function createShelters(scene, { forest, inventory, hands, getAudio, hint
       const p = PIECES[site.placed];
       if (!inventory.count(p.type)) {
         const left = PIECES.slice(site.placed).filter((x) => x.type === p.type).length;
-        return hint(left > 1 ? `Il te faut encore ${left} ${p.type === 'feuille' ? 'feuilles' : p.type === 'corde' ? 'cordes' : p.type === 'caillou' ? 'cailloux' : 'bâtons'}.` : `Il te faut ${anItem(p.type)}.`);
+        return hint(left > 1 ? `Il te faut encore ${left} ${p.type === 'feuille' ? 'feuilles' : p.type === 'corde' ? 'cordes' : p.type === 'caillou' ? 'cailloux' : p.type === 'peau' ? 'peaux de lapin' : 'bâtons'}.` : `Il te faut ${anItem(p.type)}.`);
       }
       inventory.take(p.type);
       hands.place(worldOf(site, p), p.type, () => {

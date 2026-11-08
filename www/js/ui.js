@@ -11,7 +11,7 @@ import { NEEDS } from './needs.js';
 
 const SIP = 250;
 
-export function createUI({ canvas, camera, controls, inventory, items, campfires, collectors, shelters, berries, plants, needs, sleep, forest, hands, getAudio }) {
+export function createUI({ canvas, camera, controls, inventory, items, campfires, collectors, shelters, berries, plants, rabbits, spears, needs, sleep, forest, hands, getAudio }) {
   const $ = (id) => document.getElementById(id);
   const pill = $('hint-pill'), actions = $('actions'), craft = $('craft-sheet'), recipes = $('recipes');
   const st = controls.state;
@@ -142,15 +142,68 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
     });
   }
   function eat() {
-    if (hands.busy || inventory.heldType() !== 'baies') return;
+    const type = inventory.heldType();
+    if (hands.busy || (type !== 'baies' && type !== 'viande-cuite')) return;
     if (needs.hunger > 0.99) return hint('Tu n’as plus faim pour le moment.');
     const slot = inventory.held;
-    hands.consume('baies', () => {
+    hands.consume(type, () => {
       inventory.takeAt(slot);
-      needs.eat(NEEDS.berry);
+      needs.eat(type === 'baies' ? NEEDS.berry : NEEDS.meat);
       getAudio()?.eat();
     });
   }
+
+  // la lance part vers ce qu'on regarde (point de visée au centre) : on calcule l'angle de tir
+  // pour que sa trajectoire courbe retombe sur ce point (un lapin dans la mire, sinon le sol)
+  const fwdV = new THREE.Vector3(), toR = new THREE.Vector3(), probe = new THREE.Vector3();
+  function aimTarget() {
+    camera.updateMatrixWorld();
+    camera.getWorldDirection(fwdV);
+    const eye = camera.position;
+    let best = null, ba = 0.075;
+    for (const r of rabbits.list) {
+      if (!r.alive || r.gone || Math.abs(r.x - eye.x) > 30 || Math.abs(r.z - eye.z) > 30) continue;
+      toR.set(r.x, forest.surfaceY(r.x, r.z) + 0.13, r.z).sub(eye);
+      const d = toR.length();
+      if (d > 30) continue;
+      const a = Math.acos(Math.min(1, toR.dot(fwdV) / d));
+      if (a < ba) { ba = a; best = toR.clone().add(eye); }
+    }
+    if (best) return best;
+    for (let d = 1; d <= 30; d += 0.25) {
+      probe.copy(eye).addScaledVector(fwdV, d);
+      if (probe.y <= forest.surfaceY(probe.x, probe.z)) return probe.clone();
+      if (d > 2 && forest.blocked(probe.x, probe.z, 0) && probe.y < forest.surfaceY(probe.x, probe.z) + 4) return probe.clone();
+    }
+    return probe.clone();
+  }
+  function aimVelocity(tip, v) {
+    const t = aimTarget(), g = 9.8;
+    const dx = Math.hypot(t.x - tip.x, t.z - tip.z), dy = t.y - tip.y;
+    const disc = v ** 4 - g * (g * dx * dx + 2 * dy * v * v);
+    const ang = disc >= 0 ? Math.atan((v * v - Math.sqrt(disc)) / (g * Math.max(dx, 0.01))) : Math.PI / 4;
+    const h = Math.atan2(t.x - tip.x, t.z - tip.z);
+    return new THREE.Vector3(Math.sin(h) * Math.cos(ang), Math.sin(ang), Math.cos(h) * Math.cos(ang)).multiplyScalar(v);
+  }
+
+  // ------------------------------------------------------------------ la lance : attaquer, lancer
+  const combat = $('combat');
+  $('btn-attack').addEventListener('click', () => {
+    if (hands.busy || inventory.heldType() !== 'lance' || sleep.busy) return;
+    getAudio()?.thrust();
+    hands.thrust(() => {
+      const r = rabbits.inReach(st.pos, st.yaw);
+      if (r) { rabbits.kill(r); getAudio()?.impact('lapin'); hint('Touché !', 2000); }
+    });
+  });
+  $('btn-throw').addEventListener('click', () => {
+    if (hands.busy || inventory.heldType() !== 'lance' || sleep.busy || spears.flying) return;
+    const slot = inventory.held;
+    hands.throwSpear((tip) => {
+      inventory.takeAt(slot);
+      spears.launch(tip, aimVelocity(tip, 16));
+    });
+  });
 
   // ------------------------------------------------------------------ toucher le monde
   // un toucher = appui court sans glisser (sinon c'est regarder ou marcher)
@@ -191,6 +244,36 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
         mod.act(hit.site);
         return;
       }
+    }
+    // une lance plantée : on la ramasse
+    const sp = spears.pickAt(camera, x, y, p);
+    if (sp) {
+      if (!sp.near) return hint('Approche-toi de la lance.');
+      if (!inventory.canAdd('lance')) return hint('Inventaire plein.');
+      hands.pickup({ x: sp.at.x, y: sp.at.y, z: sp.at.z }, 'lance', () => { spears.take(sp.spear); inventory.add('lance'); getAudio()?.pick('baton'); });
+      return;
+    }
+    // un lapin mort : récupérer la lance plantée dedans, puis le dépecer au couteau
+    const dead = rabbits.pickDead(camera, x, y, p);
+    if (dead) {
+      if (!dead.near) return hint('Approche-toi du lapin.');
+      const r = dead.rabbit, gy = controls.groundAt(r.x, r.z) + 0.1;
+      const lance = spears.inRabbit(r.id);
+      if (lance) {
+        if (!inventory.canAdd('lance')) return hint('Inventaire plein.');
+        hands.pickup({ x: r.x, y: gy + 0.3, z: r.z }, 'lance', () => { spears.take(lance); inventory.add('lance'); getAudio()?.pick('baton'); });
+        return;
+      }
+      if (inventory.heldType() !== 'couteau') return hint('Prends le couteau artisanal en main pour dépecer le lapin.');
+      const room = ['peau', 'viande'].every((t) => inventory.canAdd(t));
+      if (!room) return hint('Il faut de la place pour la peau et la viande.');
+      hands.skin({ x: r.x, y: gy, z: r.z }, () => {
+        rabbits.remove(r);
+        inventory.add('peau');
+        inventory.add('viande'); inventory.add('viande');
+        hint('1 peau de lapin et 2 viandes crues. La viande crue se garde 2 jours : fais-la cuire sur le feu.', 4500);
+      });
+      return;
     }
     // objets au sol, butin
     const { spot, far } = items.pickAt(camera, x, y, p);
@@ -250,7 +333,7 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
   }
 
   // ------------------------------------------------------------------ chaque image : boutons et indice selon la situation
-  let timer = 0, wasBusy = false;
+  let timer = 0, wasBusy = false, spoilTimer = 2;
   function update(dt) {
     // les boutons de l'inventaire redeviennent actifs à la fin du geste
     if (hands.busy !== wasBusy) { wasBusy = hands.busy; inventory.render(); timer = 0; }
@@ -259,6 +342,11 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
     timer = 0.2;
     const now = performance.now();
     const pm = placingMod();
+    // la viande se gâte (vérifié de temps en temps)
+    spoilTimer -= 0.2;
+    if (spoilTimer <= 0) { spoilTimer = 10; const lost = inventory.spoil(); if (lost.length) hint(lost.includes('viande') ? 'Ta viande crue a pourri : tu as dû la jeter.' : 'Ta viande cuite s’est gâtée : tu as dû la jeter.', 4500); }
+    combat.classList.toggle('on', inventory.heldType() === 'lance' && st.enabled && !sleep.busy && !pm && !(hands.busy && !combat.classList.contains('on')));
+    $('aim').classList.toggle('on', combat.classList.contains('on'));
     if (sleep.busy) { setActions('', []); pill.classList.remove('on'); return; }
     if (pm) {
       setActions('placer', [
@@ -275,7 +363,7 @@ export function createUI({ canvas, camera, controls, inventory, items, campfires
       // en haut de l'écran, pour ne pas le toucher en visant la construction
       if (site && site.stage === 'build') setActions('demonter', [{ label: 'Démonter', fn: () => mod.dismantle(site) }], true);
       else if (!hands.busy && st.enabled && held && held.type === 'bouteille') setActions('boire' + (held.w > 0), [{ label: held.w > 0 ? 'Boire' : 'Bouteille vide', main: held.w > 0, fn: drink }]);
-      else if (!hands.busy && st.enabled && held && held.type === 'baies') setActions('manger', [{ label: 'Manger', main: true, fn: eat }]);
+      else if (!hands.busy && st.enabled && held && (held.type === 'baies' || held.type === 'viande-cuite')) setActions('manger', [{ label: 'Manger', main: true, fn: eat }]);
       else setActions('', []);
       context = site && !hands.busy ? mod.label(site) : '';
     }

@@ -1,11 +1,11 @@
 // Soif et faim, en temps réel (elles baissent même appli fermée) :
 // 3 jours sans boire, 14 jours sans manger pour mourir. Il faut 1 L d'eau par
 // jour : la jauge pleine vaut 3 L, une gorgée de 25 cl remonte d'environ 8 %.
-// Une poignée de baies remonte la faim de 3 %. La mort est définitive.
+// Une poignée de baies remonte la faim de 1 %, un morceau de viande cuite de 10 %. La mort est définitive.
 // Sommeil : la jauge se vide en 2 jours éveillé ; 8 h dans l'abri la remplissent.
 // À zéro, on s'endort là où l'on est (deux fois moins réparateur). Sous 25 %, on avance moins vite.
 const DAY = 864e5, HOUR = 36e5;
-export const NEEDS = { thirstDays: 3, hungerDays: 14, sip: 0.25 / 3, berry: 0.03, awakeDays: 2, sleepHours: 8, wakeMin: 0.3 };
+export const NEEDS = { thirstDays: 3, hungerDays: 14, sip: 0.25 / 3, berry: 0.01, meat: 0.1, awakeDays: 2, sleepHours: 8, wakeMin: 0.3 };
 
 export function createNeeds({ saved, onDeath }) {
   const now = Date.now();

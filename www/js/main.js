@@ -19,6 +19,8 @@ import { createPlants } from './plants.js';
 import { createShelters } from './shelter.js';
 import { createSleep } from './sleep.js';
 import { createMap } from './map.js';
+import { createRabbits } from './rabbits.js';
+import { createSpears } from './spear.js';
 
 const mobile = matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const canvas = document.getElementById('c');
@@ -74,6 +76,8 @@ const items = createGroundItems(scene, { forest, saved: saved.items, onChange: c
 createPlaces(scene, { forest, items, shadows: true });
 const berries = createBerries(scene, { forest, season, saved: saved.berries, onChange: changed });
 const plants = createPlants(scene, { forest, season, saved: saved.plants, onChange: changed });
+const rabbits = createRabbits(scene, { forest, saved: saved.rabbits, onChange: changed });
+const spears = createSpears(scene, { forest, rabbits, getAudio: () => audio, hint: (t, ms) => ui?.hint(t, ms), onChange: changed, saved: saved.spears });
 const rain = createRain();
 let ui = null, collectors = null, shelters = null;
 const hint = (t, ms) => ui?.hint(t, ms);
@@ -101,6 +105,13 @@ function gameOver(dead, instant = false) {
 }
 const needs = createNeeds({ saved: saved.needs, onDeath: (d) => setTimeout(() => gameOver(d)) });
 document.getElementById('btn-newgame').addEventListener('click', () => { saver.reset(); location.reload(); });
+// recommencer une partie depuis l'écran d'accueil (avec confirmation)
+{
+  const line = document.getElementById('btn-reset').parentElement, confirmBox = document.getElementById('reset-confirm');
+  document.getElementById('btn-reset').addEventListener('click', () => { line.hidden = true; confirmBox.hidden = false; });
+  document.getElementById('btn-reset-no').addEventListener('click', () => { line.hidden = false; confirmBox.hidden = true; });
+  document.getElementById('btn-reset-yes').addEventListener('click', () => { saver.reset(); location.reload(); });
+}
 
 // la carte : on ne bouge pas pendant qu'on la lit
 const map = createMap({ saved: saved.map, onChange: changed, onOpen: (on) => { controls.state.enabled = !on && !needs.asleep && !over; } });
@@ -109,10 +120,10 @@ const sleep = createSleep({ controls, needs, shelters, forest, hint, getAudio: (
 shelters.setSleepHandler((site) => sleep.start(site));
 needs.setCollapse(() => setTimeout(() => sleep.collapse()));
 sleep.restore(startAt);
-ui = createUI({ canvas, camera, controls, inventory, items, campfires, collectors, shelters, berries, plants, needs, sleep, forest, hands, getAudio: () => audio });
+ui = createUI({ canvas, camera, controls, inventory, items, campfires, collectors, shelters, berries, plants, rabbits, spears, needs, sleep, forest, hands, getAudio: () => audio });
 const playerData = () => (controls.state.lie ? savedPlayer : (savedPlayer = { x: +controls.state.pos.x.toFixed(2), z: +controls.state.pos.z.toFixed(2), yaw: +controls.state.yaw.toFixed(3) }));
 let savedPlayer = startAt;
-saver = createSaver({ inv: inventory.data, items: items.data, fires: campfires.data, cols: collectors.data, shelters: shelters.data, berries: berries.data, plants: plants.data, needs: needs.data, player: playerData, map: map.data });
+saver = createSaver({ inv: inventory.data, items: items.data, fires: campfires.data, cols: collectors.data, shelters: shelters.data, berries: berries.data, plants: plants.data, needs: needs.data, player: playerData, map: map.data, rabbits: rabbits.data, spears: spears.data });
 setInterval(() => saver.soon(), 10000); // la position est sauvegardée régulièrement
 if (needs.dead) gameOver(needs.dead, true);
 
@@ -208,6 +219,8 @@ function frame(now) {
   items.update(dt, p);
   berries.update(dt);
   plants.update(dt);
+  rabbits.update(dt, p);
+  spears.update(dt);
   shelters.update(dt, p, camera, controls.state.yaw);
   sleep.update(dt);
   collectors.update(dt, p, camera, controls.state.yaw);
@@ -218,6 +231,7 @@ function frame(now) {
     const dB = forest.streamDist(p.x, p.z);
     audio.setAmbience({ rain: wNow.rain, wind: wNow.wind, snow: wNow.snow, day: sky.state.day, birds: birdSeason, brook: 1 / (1 + dB * dB * 0.012) });
     audio.setFire(fire.level);
+    audio.setSizzle(fire.sizzle || 0);
   }
   // les mains, éclairées comme le décor (ciel, soleil, feu proche)
   handLight.day = sky.state.day;
@@ -236,4 +250,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__survival = { forest, controls, sky, scene, camera, renderer, weather, inventory, items, hands, campfires, collectors, shelters, berries, plants, needs, sleep, map, rain, ui, saver, ready: true };
+window.__survival = { forest, controls, sky, scene, camera, renderer, weather, inventory, items, hands, campfires, collectors, shelters, berries, plants, rabbits, spears, needs, sleep, map, rain, ui, saver, ready: true };

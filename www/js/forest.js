@@ -411,8 +411,9 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
   const inWalk = (x, z, m = 1) => Math.abs(x) < WALL + m && Math.abs(z) < WALL + m;
   // collisions : rectangles rangés par carré de 8 m (pour les tests rapides du feu de camp)
   const CG = new Map();
-  const box = (x, z, hx, hz = hx) => {
-    const c = { x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz };
+  // low : obstacle bas (rocher, tronc couché, galette de racines) qu'une lance lancée survole
+  const box = (x, z, hx, hz = hx, low = false) => {
+    const c = { x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz, low };
     colliders.push(c);
     const k = gk(Math.floor(x / 8), Math.floor(z / 8));
     if (!CG.has(k)) CG.set(k, []);
@@ -428,13 +429,15 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
     }
   }
   // y a-t-il un obstacle (arbre, rocher, tronc) dans ce disque ?
-  function blocked(x, z, r) {
+  // tallOnly : seuls les obstacles hauts (arbres, murs) comptent (une lance qui passe au-dessus du reste)
+  function blocked(x, z, r, tallOnly = false) {
     for (let i = Math.floor((x - r - 2) / 8); i <= Math.floor((x + r + 2) / 8); i++) for (let j = Math.floor((z - r - 2) / 8); j <= Math.floor((z + r + 2) / 8); j++) {
       const L = CG.get(gk(i, j));
-      if (L) for (const c of L) if (x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) return true;
+      if (L) for (const c of L) if ((!tallOnly || !c.low) && x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) return true;
     }
     return false;
   }
+
 
   // abords des gués dégagés
   for (const zc of CROSSINGS) for (let k = -5; k <= 5; k++) gAdd(streamX(zc) + k, zc, 1.2);
@@ -557,7 +560,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
           const ang = (k / 5) * Math.PI * 2 + rnd();
           part(new THREE.CylinderGeometry(0.03, 0.07, R * 0.9, 5).rotateZ(-Math.PI / 2 + Math.cos(ang) * 0.6).rotateY(Math.sin(ang) * 0.9).translate(-len / 2 - 0.35, R * 0.45 + Math.cos(ang) * R * 0.6, Math.sin(ang) * R * 0.6), 0x4d3a2a);
         }
-        if (inWalk(x, z, 3)) box(x - ca * (len / 2 + 0.12), z + sa * (len / 2 + 0.12), R * 0.75);
+        if (inWalk(x, z, 3)) box(x - ca * (len / 2 + 0.12), z + sa * (len / 2 + 0.12), R * 0.75, R * 0.75, true);
       } else {
         part(new THREE.CylinderGeometry(r * 0.88, r * 0.88, 0.05, 8).rotateZ(-Math.PI / 2).translate(-len / 2 - 0.01, 0, 0), 0xc39a68);
       }
@@ -576,7 +579,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
       B.pop();
       for (const [px, pz] of pts.slice(1, -1)) {
         gAdd(px, pz, r + 0.3);
-        if (inWalk(px, pz)) box(px, pz, r + 0.06);
+        if (inWalk(px, pz)) box(px, pz, r + 0.06, r + 0.06, true);
       }
       made++;
     }
@@ -623,7 +626,7 @@ export function createForest(scene, { season, mobile = false, shadows = true }) 
     const sx = s * (0.8 + rnd() * 0.5), sy = s * (0.55 + rnd() * 0.35);
     rocks[Math.floor(rnd() * 3)].push({ x, z, y: height(x, z) - 0.12 * sy, sx, sy, sz: s, rot: rnd() * 6.28, tx: (rnd() - 0.5) * 0.3, tz: (rnd() - 0.5) * 0.3 });
     gAdd(x, z, 0.45 * Math.max(sx, s));
-    if (s > 0.55 && inWalk(x, z)) box(x, z, 0.4 * Math.max(sx, s));
+    if (s > 0.55 && inWalk(x, z)) box(x, z, 0.4 * Math.max(sx, s), 0.4 * Math.max(sx, s), true);
     return true;
   };
   for (let c = 0; c < 230; c++) {
