@@ -393,7 +393,8 @@ export function createCabins(scene, { forest, inventory, hands, logs, getAudio, 
     const p = site.pieces[site.placed];
     const world = toWorld(site, p.at);
     if (p.log) {
-      if (!logs.carrying) {
+      if (logs.carriedKind !== 'buche') {
+        if (logs.carrying) return hint('Ici, il faut une bûche, pas des planches.');
         const n = left(site, (x) => x.log && x.phase === p.phase);
         return hint(`Apporte une bûche sur l’épaule (${p.phase} : encore ${n}, ${left(site, (x) => x.log)} en tout).`, 3500);
       }

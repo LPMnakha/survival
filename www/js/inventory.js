@@ -1,14 +1,14 @@
 // Inventaire : 5 cases sans sac (dont 3 d'accès rapide toujours visibles),
-// 8 avec la sacoche équipée. Piles de 10 au plus ; un même objet peut occuper
+// 8 avec la sacoche équipée, 15 avec le sac à dos en fibre. Piles de 10 au plus ; un même objet peut occuper
 // plusieurs cases. Toucher une case d'accès rapide met l'objet en main (ou le
 // range) ; dans l'inventaire complet, toucher une case puis une autre les échange.
 // Équipement : tête, haut, bas, chaussures, sac (la sacoche va dans la case sac).
 import { ITEMS, ICONS, itemName, anItem, bottleIcon, fmtWater, EQUIP_SLOTS, PERISH } from './models.js';
 
-export const MAX = 8, BASE = 5, QUICK = 3;
+export const MAX = 15, BASE = 5, QUICK = 3;
 
 export function createInventory({ saved, onChange }) {
-  let slots = [{ type: 'pierre-a-feu', n: 1 }, null, null, null, null, null, null, null];
+  let slots = [{ type: 'pierre-a-feu', n: 1 }, ...Array(MAX - 1).fill(null)];
   let held = -1;
   const equip = { tete: null, haut: null, bas: null, chaussures: null, sac: null };
   // les denrées périssables gardent la date de chaque morceau (le plus ancien d'abord)
@@ -26,7 +26,8 @@ export function createInventory({ saved, onChange }) {
     held = Number.isInteger(saved.held) && saved.held < QUICK ? saved.held : -1;
     for (const k of Object.keys(equip)) if (saved.equip && saved.equip[k] && ITEMS[saved.equip[k].type]) equip[k] = { type: saved.equip[k].type };
   }
-  const cap = () => BASE + (equip.sac ? 3 : 0);
+  const bagSlots = (type) => (type && ITEMS[type].slots) || 0;
+  const cap = () => BASE + bagSlots(equip.sac?.type);
   const changed = () => { render(); onChange?.(); };
   const usable = () => slots.slice(0, cap()).map((s, i) => [s, i]);
 
@@ -129,7 +130,22 @@ export function createInventory({ saved, onChange }) {
   function equipFrom(i) {
     const s = slots[i];
     const where = s && ITEMS[s.type].wear;
-    if (!where || equip[where]) return false;
+    if (!where) return false;
+    const old = equip[where];
+    if (old && old.type === s.type) return false;
+    if (old) {
+      // changer de sac : l'ancien prend la place du nouveau ; passer à un plus petit demande des cases vides
+      const newCap = BASE + bagSlots(s.type);
+      if (slots.slice(newCap, MAX).some((x, k) => x && newCap + k !== i)) return 'sac-plein';
+      let to = i;
+      if (i >= newCap) { to = slots.findIndex((x, k) => k < newCap && !x); if (to < 0) return 'plein'; }
+      equip[where] = { type: s.type };
+      slots[i] = null;
+      slots[to] = { type: old.type, n: 1 };
+      if (held === i) held = -1;
+      changed();
+      return true;
+    }
     equip[where] = { type: s.type };
     slots[i] = null;
     if (held === i) held = -1;
@@ -214,7 +230,7 @@ export function createInventory({ saved, onChange }) {
     dropBtn.textContent = s && s.type !== 'pierre-a-feu' ? `Jeter ${anItem(s.type)}` : 'Jeter';
     const wear = s && ITEMS[s.type].wear;
     equipBtn.hidden = !wear;
-    equipBtn.disabled = !wear || !!equip[wear] || locked();
+    equipBtn.disabled = !wear || (equip[wear] && equip[wear].type === s.type) || locked();
     readBtn.hidden = !(s && s.type === 'carte');
     // équipement
     eqSlots.querySelectorAll('.slot').forEach((b) => {
@@ -229,7 +245,7 @@ export function createInventory({ saved, onChange }) {
     if (eqSel && !equip[eqSel]) eqSel = null;
     eqBtn.disabled = !eqSel || locked();
     eqBtn.textContent = eqSel ? `Retirer la ${ITEMS[equip[eqSel].type].one}` : 'Retirer';
-    eqHint.textContent = equip.sac ? 'La sacoche ajoute 3 cases à l’inventaire.' : 'Rien d’équipé pour l’instant. Une sacoche trouvée irait dans la case sac.';
+    eqHint.textContent = equip.sac ? (equip.sac.type === 'sac-a-dos' ? 'Le sac à dos en fibre ajoute 10 cases : 15 en tout.' : 'La sacoche ajoute 3 cases à l’inventaire.') : 'Rien d’équipé pour l’instant. Une sacoche ou un sac à dos irait dans la case sac.';
   }
   function open(on = !sheet.classList.contains('on')) {
     sel = -1;
@@ -248,13 +264,16 @@ export function createInventory({ saved, onChange }) {
   equipBtn.addEventListener('click', () => {
     if (equipBtn.disabled) return;
     const t = slots[sel]?.type;
-    if (equipFrom(sel)) { sel = -1; onEquip?.(`${ITEMS[t].one[0].toUpperCase() + ITEMS[t].one.slice(1)} équipée : 3 cases en plus.`); render(); }
+    const r = equipFrom(sel);
+    if (r === true) { sel = -1; onEquip?.(t === 'sac-a-dos' ? 'Sac à dos en fibre équipé : 15 cases en tout.' : `${ITEMS[t].one[0].toUpperCase() + ITEMS[t].one.slice(1)} équipée : 3 cases en plus.`); render(); }
+    else if (r === 'sac-plein') onEquip?.('Vide d’abord les cases du sac à dos qui n’existent pas dans la sacoche.');
+    else if (r === 'plein') onEquip?.('Il faut une case libre pour ranger l’autre sac.');
   });
   eqBtn.addEventListener('click', () => {
     if (eqBtn.disabled) return;
     const r = unequip(eqSel);
-    if (r === 'sac-plein') onEquip?.('Vide d’abord les 3 cases de la sacoche.');
-    else if (r === 'plein') onEquip?.('Il faut une case libre pour ranger la sacoche.');
+    if (r === 'sac-plein') onEquip?.('Vide d’abord les cases du sac.');
+    else if (r === 'plein') onEquip?.('Il faut une case libre pour ranger le sac.');
     else eqSel = null;
     render();
   });

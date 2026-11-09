@@ -10,7 +10,8 @@ export const ITEMS = {
   'pierre-a-feu': { one: 'pierre à feu', many: 'pierres à feu', stack: 1 },
   bache: { one: 'bâche', many: 'bâches', stack: 1 },
   bouteille: { one: 'bouteille', many: 'bouteilles', stack: 1 },
-  sacoche: { one: 'sacoche', many: 'sacoches', stack: 1, wear: 'sac' },
+  sacoche: { one: 'sacoche', many: 'sacoches', stack: 1, wear: 'sac', slots: 3 },
+  'sac-a-dos': { one: 'sac à dos en fibre', many: 'sacs à dos en fibre', stack: 1, wear: 'sac', slots: 10 },
   baies: { one: 'poignée de baies', many: 'poignées de baies', stack: 10 },
   silex: { one: 'silex', many: 'silex', stack: 10 },
   feuille: { one: 'feuille', many: 'feuilles', stack: 10 },
@@ -30,12 +31,13 @@ export const ITEMS = {
   mousse: { one: 'poignée de mousse', many: 'poignées de mousse', stack: 10 },
   // la bûche ne va pas dans l'inventaire : elle se porte sur l'épaule (nom pour les recettes)
   buche: { one: 'bûche', many: 'bûches', stack: 0 },
+  planche: { one: 'planche', many: 'planches', stack: 0 },
 };
 export const isTorch = (type) => type === 'torche' || type === 'torche-enduite' || type === 'torche-allumee';
 // ce qui se gâte (temps réel)
 export const PERISH = { viande: 2 * 864e5, 'viande-cuite': 4 * 864e5 };
 // « un caillou », « une bâche »…
-const FEM = new Set(['brindille', 'pierre-a-feu', 'bache', 'bouteille', 'sacoche', 'baies', 'feuille', 'fibre', 'corde', 'lance', 'carte', 'peau', 'viande', 'viande-cuite', 'torche', 'torche-enduite', 'torche-allumee', 'hachette', 'mousse', 'buche']);
+const FEM = new Set(['brindille', 'pierre-a-feu', 'bache', 'bouteille', 'sacoche', 'baies', 'feuille', 'fibre', 'corde', 'lance', 'carte', 'peau', 'viande', 'viande-cuite', 'torche', 'torche-enduite', 'torche-allumee', 'hachette', 'mousse', 'buche', 'planche']);
 export const anItem = (type) => (FEM.has(type) ? 'une ' : 'un ') + ITEMS[type].one;
 export const theItem = (type) => (FEM.has(type) ? 'cette ' : type === 'baies' ? 'ces ' : 'ce ') + ITEMS[type].one;
 export const itemName = (type, n = 1) => (n > 1 ? ITEMS[type].many : ITEMS[type].one);
@@ -98,6 +100,19 @@ export function itemGeometry(type, variant = 0) {
     const cap = new THREE.CylinderGeometry(0.016, 0.016, 0.018, 8).translate(0, 0.278, 0);
     const label = new THREE.CylinderGeometry(0.0365, 0.0365, 0.07, 8).translate(0, 0.11, 0);
     g = mergeColored([[body, 0xbfd8e2], [shoulder, 0xbfd8e2], [neck, 0xbfd8e2], [cap, 0x2d6fb3], [label, 0xe9e3d3]]);
+  } else if (type === 'sac-a-dos') {
+    // sac en toile de fibres, rabat, deux bretelles en corde, armature de bâtons
+    const cloth = 0xa99d6c, dark = 0x8f8458, rope = 0xa48d62, wood = 0x7a5e45;
+    g = mergeColored([
+      [new THREE.BoxGeometry(0.3, 0.38, 0.14).translate(0, 0.19, 0), cloth],
+      [new THREE.BoxGeometry(0.31, 0.14, 0.15).translate(0, 0.33, 0.006), dark],
+      [new THREE.BoxGeometry(0.22, 0.12, 0.05).translate(0, 0.12, 0.09), dark],
+      [new THREE.CylinderGeometry(0.012, 0.012, 0.44, 5).translate(-0.13, 0.2, -0.08), wood],
+      [new THREE.CylinderGeometry(0.012, 0.012, 0.44, 5).translate(0.13, 0.2, -0.08), wood],
+      [new THREE.TorusGeometry(0.11, 0.009, 4, 10, Math.PI).rotateY(Math.PI / 2).scale(1, 1.4, 0.6).translate(-0.08, 0.2, -0.09), rope],
+      [new THREE.TorusGeometry(0.11, 0.009, 4, 10, Math.PI).rotateY(Math.PI / 2).scale(1, 1.4, 0.6).translate(0.08, 0.2, -0.09), rope],
+      [new THREE.TorusGeometry(0.05, 0.007, 4, 8).rotateX(Math.PI / 2).translate(0, 0.27, 0.075), rope],
+    ]);
   } else if (type === 'sacoche') {
     // petite sacoche en toile, rabat et bandoulière
     const bag = new THREE.BoxGeometry(0.26, 0.18, 0.09).translate(0, 0.09, 0);
@@ -277,6 +292,7 @@ export const ICONS = {
   brindille: '<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="#b08a62" stroke-linecap="round"><path d="M5 25 27 8" stroke-width="2.2"/><path d="M13 19l-2-6M19 14.5l5 1.5M9 22.5l-4.5-1" stroke-width="1.5"/></g></svg>',
   baton: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4.5 25.5 25 5" stroke="#7a5e45" stroke-width="5" stroke-linecap="round"/><circle cx="25" cy="5" r="2.2" fill="#c49c6e"/><path d="M14 15.5l3.5 3" stroke="#6a5038" stroke-width="2" stroke-linecap="round"/></svg>',
   bache: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 11.5 16 8l11 3.5v9L16 24 5 20.5z" fill="#3f7fb8"/><path d="M5 11.5 16 8l11 3.5L16 15z" fill="#5a98cc"/><circle cx="7.5" cy="13" r="1.1" fill="#d6dade"/><circle cx="24.5" cy="13" r="1.1" fill="#d6dade"/></svg>',
+  'sac-a-dos': '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M11 7c0-3 10-3 10 0" fill="none" stroke="#a48d62" stroke-width="2"/><rect x="7" y="7" width="18" height="21" rx="4" fill="#a99d6c"/><path d="M7 11a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v4H7z" fill="#8f8458"/><rect x="10" y="19" width="12" height="7" rx="2" fill="#8f8458"/><circle cx="16" cy="14" r="1.4" fill="#c9b27e"/><path d="M9 21h14M9 24h14" stroke="#b8ad80" stroke-width=".8"/></svg>',
   sacoche: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 12a7 7 0 0 1 14 0" fill="none" stroke="#5e4e35" stroke-width="2"/><rect x="6" y="12" width="20" height="14" rx="3" fill="#7a6747"/><path d="M6 15a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v3H6z" fill="#665538"/><rect x="14.5" y="16.5" width="3" height="3" rx=".6" fill="#c9b27e"/></svg>',
   baies: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 22c3-8 9-12 18-13-3 7-9 11-18 13z" fill="#5f8f42"/><g fill="#c2304a"><circle cx="11" cy="19" r="3.2"/><circle cx="16.5" cy="21.5" r="3"/><circle cx="14" cy="15" r="2.8"/><circle cx="19.5" cy="16.5" r="2.6"/></g><g fill="#f4b3bd"><circle cx="10" cy="18" r=".8"/><circle cx="15.6" cy="20.6" r=".7"/><circle cx="13.2" cy="14.2" r=".7"/></g></svg>',
   silex: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 19 10 10l9-3 7 6-2 9-11 3z" fill="#3a3c45"/><path d="M10 10l9-3 7 6-9 2z" fill="#5a5d6a"/><path d="M6 19l4-9 7 5-4 10z" fill="#2c2e35"/><path d="M19 7l4 1-2 3z" fill="#ddd6c6"/></svg>',
