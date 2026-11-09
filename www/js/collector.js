@@ -135,17 +135,21 @@ export function createCollectors(scene, { forest, inventory, hands, rain, getAud
 
   // ------------------------------------------------------------------ toucher
   const p3 = new THREE.Vector3();
+  // toucher : un vrai lancer de rayon sur la géométrie. Monté, seule la bâche (et l'eau dedans)
+  // répond, pour qu'on puisse ramasser ce qui est posé juste à côté ; en chantier, les pièces à poser.
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   function pickAt(camera, px, py, player, reach = 3.0) {
     let best = null, bd = Infinity;
+    ndc.set((px / innerWidth) * 2 - 1, -(py / innerHeight) * 2 + 1);
+    camera.updateMatrixWorld();
+    ray.setFromCamera(ndc, camera);
+    ray.far = 8;
     for (const s of sites) {
-      const dist = Math.hypot(s.x - player.x, s.z - player.z);
-      if (dist > 7) continue;
-      p3.set(s.x, s.y + 0.4, s.z).project(camera);
-      if (p3.z > 1) continue;
-      const sx = (p3.x * 0.5 + 0.5) * innerWidth, sy = (-p3.y * 0.5 + 0.5) * innerHeight;
-      const rad = Math.max(60, Math.min(240, (innerHeight * 0.6) / Math.max(0.5, dist)));
-      const d = Math.hypot(sx - px, sy - py);
-      if (d < rad && d < bd) { bd = d; best = s; }
+      if (Math.hypot(s.x - player.x, s.z - player.z) > 7) continue;
+      s.group.updateMatrixWorld(true);
+      const targets = s.stage === 'built' ? s.group.children.filter((m) => m.geometry === tarpGeo || m === s.water) : s.group.children;
+      const hit = ray.intersectObjects(targets, false)[0];
+      if (hit && hit.distance < bd) { bd = hit.distance; best = s; }
     }
     return best ? { site: best, near: Math.hypot(best.x - player.x, best.z - player.z) <= reach } : null;
   }
