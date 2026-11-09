@@ -12,20 +12,24 @@ import { LOG } from './logs.js';
 
 export const CHOP = { fell: 80, branches: 10, cut: 15 };
 const DAY = 864e5, REGROW = 3 * DAY, STUMP_LIFE = 20 * DAY;
-const N = 2000, ACTIVE = 1500;
+// première vague (2000 emplacements, 1500 arbres), puis une deuxième, plus dense (3000 emplacements, 2600 arbres) :
+// les numéros des premiers restent les mêmes, les parties en cours gardent leurs arbres entaillés
+const N = 2000, ACTIVE = 1500, N2 = 3000, ACTIVE2 = 2600;
+const dflt = (id) => (id < ACTIVE || (id >= N && id < N + ACTIVE2) ? 'tree' : 'empty');
 const H = 7.0, R0 = 0.075, R1 = 0.03, CUT = 0.5, GAP = 0.05;
 const radiusAt = (h) => R0 - (R0 - R1) * (h / H);
 const spruceColors = [0x2c4a33, 0x31523a, 0x2a4631, 0x355a3d, 0x2f4e36, 0x36593e, 0x2e4c35];
-const BARK = { e: 0x4e3828, b: 0xdedad0 };
+// un jeune bouleau n'est pas encore blanc : son écorce est brun-rouge, piquée de lenticelles claires
+const BARK = { e: 0x4e3828, b: 0x7a4c3a };
 
 // un bout de tronc entre deux hauteurs (repère de l'arbre, axe y)
 function trunkParts(sp, y0, y1) {
   const parts = [[new THREE.CylinderGeometry(radiusAt(y1), radiusAt(y0), y1 - y0, 7).translate(0, (y0 + y1) / 2, 0), BARK[sp]]];
   if (sp === 'b') {
-    // taches sombres du bouleau
-    for (let y = Math.ceil(y0 * 2.2) / 2.2 + 0.2; y < y1 - 0.1; y += 0.45) {
-      const r = radiusAt(y), a = y * 5.1;
-      parts.push([new THREE.BoxGeometry(r * 0.9, 0.025, 0.012).translate(0, 0, r * 0.98).rotateY(a).translate(0, y, 0), 0x3a3530]);
+    // lenticelles : petits traits clairs horizontaux
+    for (let y = Math.ceil(y0 * 4) / 4 + 0.12; y < y1 - 0.1; y += 0.25) {
+      const r = radiusAt(y);
+      for (const a of [y * 5.1, y * 5.1 + 2.3, y * 5.1 + 4.2]) parts.push([new THREE.BoxGeometry(r * 0.7, 0.012, 0.01).translate(0, 0, r * 0.99).rotateY(a).translate(0, y, 0), 0xcdb9a0]);
     }
   }
   return parts;
@@ -61,10 +65,10 @@ export function createTrees(scene, { forest, items, logs, hands, getAudio, hint,
     }
     return false;
   };
-  const tryAdd = (x, z) => {
+  const tryAdd = (x, z, rnd = R) => {
     if (!forest.inWalk(x, z, -4) || forest.streamDist(x, z) < 3.2 || forest.nearSite(x, z, 4) || !forest.isFree(x, z, 0.9)) return false;
     if (Math.hypot(x - sp0.x, z - sp0.z) < 6 || nearSlot(x, z, 2.4)) return false;
-    const s = { id: slots.length, x, z, y: forest.groundAt(x, z) - 0.05, sp: R() < 0.68 ? 'e' : 'b', s: 0.9 + R() * 0.25, rot: R() * 6.28, st: slots.length < ACTIVE ? 'tree' : 'empty', n: 0, f: 0, at: 0 };
+    const s = { id: slots.length, x, z, y: forest.groundAt(x, z) - 0.05, sp: rnd() < 0.68 ? 'e' : 'b', s: 0.9 + rnd() * 0.25, rot: rnd() * 6.28, st: dflt(slots.length), n: 0, f: 0, at: 0 };
     slots.push(s);
     const k = gk(x, z);
     if (!G.has(k)) G.set(k, []);
@@ -79,6 +83,16 @@ export function createTrees(scene, { forest, items, logs, hands, getAudio, hint,
     const x = (R() * 2 - 1) * 395, z = (R() * 2 - 1) * 395;
     if (forest.clearingAt(x, z) > 0.6 && R() < 0.75) continue;
     tryAdd(x, z);
+  }
+  // deuxième vague : beaucoup plus autour du départ, et partout ailleurs
+  const R2 = makeNoise(92).rnd;
+  guard = 0;
+  while (slots.length < N + 150 && guard++ < 8000) { const a = R2() * 6.28, d = 7 + R2() * 65; tryAdd(sp0.x + Math.sin(a) * d, sp0.z + Math.cos(a) * d, R2); }
+  guard = 0;
+  while (slots.length < N + N2 && guard++ < N2 * 60) {
+    const x = (R2() * 2 - 1) * 395, z = (R2() * 2 - 1) * 395;
+    if (forest.clearingAt(x, z) > 0.6 && R2() < 0.6) continue;
+    tryAdd(x, z, R2);
   }
   // l'état sauvegardé, et rien ne pousse sur une construction
   if (saved && saved.s) for (const [id, d] of Object.entries(saved.s)) { const s = slots[id]; if (s && d) Object.assign(s, { st: d.st || s.st, n: d.n || 0, f: d.f || 0, at: d.at || 0 }); }
@@ -422,7 +436,7 @@ export function createTrees(scene, { forest, items, logs, hands, getAudio, hint,
     update, pickAt, pickBig, start, stop, label, progress, slots, fallen,
     get chopping() { return !!job; },
     data: () => ({
-      s: Object.fromEntries(slots.filter((s) => s.dirty || s.n || s.st !== (s.id < ACTIVE ? 'tree' : 'empty')).map((s) => [s.id, { st: s.st, n: s.n, f: +s.f.toFixed(3), at: s.at }])),
+      s: Object.fromEntries(slots.filter((s) => s.dirty || s.n || s.st !== dflt(s.id)).map((s) => [s.id, { st: s.st, n: s.n, f: +s.f.toFixed(3), at: s.at }])),
       fallen: fallen.map((F) => ({ id: F.s.id, stage: F.stage, k: F.k, theta: +(F.falling ? F.target : F.theta).toFixed(3) })),
     }),
   };
